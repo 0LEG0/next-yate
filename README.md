@@ -20,9 +20,10 @@ It contains two APIs to Yate:
 - Cache of all requests in offline mode.
 - Auto-acknowledge of the incoming messages by acknowledge_timeout. (This can be critical under high load, as it prevents Yate from crashing).
 
-API documentation /doc/index.html
+[API description /doc](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/doc/index.html)
 
 https://docs.yate.ro/wiki/Javascript_Reference
+
 https://docs.yate.ro/wiki/External_module_command_flow
 
 
@@ -185,6 +186,6 @@ export NODE_PATH=/path_to/share/scripts
 ```
 
 
-Documentation /doc/index.html
+[API Description /doc](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/doc/index.html)
 
-Examples /examples
+[Examples /examples](https://github.com/0LEG0/next-yate/tree/master/examples)
