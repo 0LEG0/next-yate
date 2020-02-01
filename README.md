@@ -52,15 +52,15 @@ https://docs.yate.ro/wiki/External_module_command_flow
 | Message.getResult     | yes            | -         |            |
 | Engine.output         | yes            | yes       |            |
 | Engine.debug          | yes            | yes       |            |
-| Engine.alarm          | yes            | -         |            |
+| Engine.alarm          | yes            | yes       |            |
 | Engine.sleep          | yes            | yes       | _async_    |
 | Engine.usleep         | yes            | yes       | _async_    |
 | Engine.yield          | yes            | -         |            |
 | Engine.idle           | yes            | -         |            |
 | Engine.restart        | yes            | -         |            |
-| Engine.dump_r         | yes            | yes       | _not full_ |
-| Engine.print_r        | yes            | yes       | _not full_ |
-| Engine.dump_t         | yes            | -         |            |
+| Engine.dump_r         | yes            | yes       | _async_    |
+| Engine.print_r        | yes            | yes       |            |
+| Engine.dump_t         | yes            | yes       | _async_    |
 | Engine.print_t        | yes            | yes       |            |
 | Engine.debugName      | yes            | yes       |            |
 | Engine.debugLevel     | yes            | yes       |            |
@@ -84,7 +84,7 @@ https://docs.yate.ro/wiki/External_module_command_flow
 | Engine.btoh           | yes            | -         |            |
 | Engine.htob           | yes            | -         |            |
 | Engine.shared         | yes            | -         |            |
-| Engine.name           | yes            | -         |            |
+| Engine.name           | yes            | yes       |            |
 | Math.abs              | yes            | yes       |            |
 | Math.max              | yes            | yes       |            |
 | Math.min              | yes            | yes       |            |
@@ -137,8 +137,8 @@ role=global
 ;
 ; Local stdin/stdout connected scripts
 [scripts]
-/usr/bin/node=local_script.js; You must be sure that Nodejs will find the necessary libraries
-local_script.sh=; Proxy startup script with environment settings
+myscript.sh=           ; Custom shell wrapper around Nodejs script
+node.sh=my_script.js    ; Run my_script.js with example wrapper: examples/node.sh
 ```
 
 ### Network connected script
@@ -147,7 +147,7 @@ example_core_api.js:
 
 ```javascript
 // Core API
-const { Yate, Message } = require("/path_to/libyate.js");
+const { Yate, Message } = require("next-yate");
 let yate = new Yate({ host: "127.0.0.1" });
 
 yate.init(() => console.log("Connected")); // Initialize connection before use
@@ -157,7 +157,7 @@ exapmle_compatible_api.js:
 
 ```javascript
 // Compatible API
-const { getEngine } = require("/path_to/libyate.js");
+const { getEngine } = require("next-yate");
 const { Engine, Message } = getEngine({ host: "127.0.0.1" });
 
 Engine.output("Hello World!");
@@ -171,18 +171,21 @@ extmodule.conf:
 
 ```
 [scripts]
-local_script.sh=
+node.sh=my_scrypt.js
 ```
 
-Example of shell script
+Example of shell wrapper around Nodejs
 
-local_script.sh:
+node.sh:
 
 ```
 #!/bin/sh
-cd /path_to/share/scripts
-export NODE_PATH=/path_to/share/scripts
-/usr/bin/node eliza.js
+
+SCRIPTS=/path_to/share/scripts
+export NODE_PATH=$SCRIPTS
+NODE=`which node`
+
+$NODE $SCRIPTS/$1
 ```
 
 

@@ -8,7 +8,7 @@
  * >route 99991001
  */
 
-const { Yate, Message } = require("libyate.js");
+const { Yate, Message } = require("next-yate");
 
 let yate = new Yate({host: "127.0.0.1", debug: true});
 yate.init();

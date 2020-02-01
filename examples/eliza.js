@@ -23,19 +23,18 @@
  * To use it put in extmodule.conf:
  *
  * [scripts]
- * eliza.sh=
+ * node.sh=eliza.js
  */
 
 // Adapted to Nodejs by Anton <aucyxob@gmail.com>
 const { chatWithBot } = require("libchatbot.js"); // #require "libchatbot.js"
-const { getEngine } = require("libyate.js"); // load libyate
-const { Engine, Message } = getEngine({}); //load compatible API objects
+const { getEngine } = require("next-yate");
+const { Engine, Message } = getEngine(); //load compatible API objects
 global.Engine = Engine;
 global.Message = Message; // share Engine and Message with other modules.
 
 function onCommand(msg) {
-	if (msg.partline)
-		// if (msg.partline != "")
+	if (msg.partline) // if (msg.partline != "")
 		return false;
 	if (msg.line == "") return false;
 	msg.retValue(chatWithBot(msg.line, msg.cmd_address) + "\r\n");

@@ -376,7 +376,7 @@ It provides connection to Yate's external module.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line387">line 387</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line412">line 412</a>
     </li></ul></dd>
     
 
@@ -414,7 +414,7 @@ It provides connection to Yate's external module.
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const {Yate, Message} = require("libyate.js");
+    <pre class="prettyprint"><code>const {Yate, Message} = require("next-yate");
 let yate = new Yate({host: "127.0.0.1", trackname: "myscript"});
 yate.init();</code></pre>
 
@@ -570,7 +570,7 @@ yate.init();</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line811">line 811</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line838">line 838</a>
     </li></ul></dd>
     
 
@@ -601,7 +601,7 @@ yate.init();</code></pre>
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const {Yate, Message} = require("libyate.js");
+    <pre class="prettyprint"><code>const {Yate, Message} = require("next-yate");
 let yate = new Yate();
 yate.init();
 // callback variant
@@ -720,7 +720,7 @@ console.log(res.retValue());</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line790">line 790</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line817">line 817</a>
     </li></ul></dd>
     
 
@@ -751,7 +751,7 @@ console.log(res.retValue());</code></pre>
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const {Yate, Message} = require("libyate.js");
+    <pre class="prettyprint"><code>const {Yate, Message} = require("next-yate");
 let yate = new Yate();
 yate.init();
 let m = new Message("call.drop", false, { id: "sip/123" });
@@ -817,7 +817,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line546">line 546</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line573">line 573</a>
     </li></ul></dd>
     
 
@@ -977,7 +977,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line471">line 471</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line498">line 498</a>
     </li></ul></dd>
     
 
@@ -1213,7 +1213,7 @@ The yate engine will wait for a response to its message.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line572">line 572</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line599">line 599</a>
     </li></ul></dd>
     
 
@@ -1253,7 +1253,7 @@ The yate engine will wait for a response to its message.
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const {Yate, Message} = require("libyate.js");
+    <pre class="prettyprint"><code>const {Yate, Message} = require("next-yate");
 
 function onRoute(message) {
     message.retvalue("tone/ring"); // send the incoming call to tone/ring module
@@ -1372,7 +1372,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line847">line 847</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line874">line 874</a>
     </li></ul></dd>
     
 
@@ -1555,7 +1555,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line725">line 725</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line752">line 752</a>
     </li></ul></dd>
     
 
@@ -1593,7 +1593,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const {Yate, Message} = require("libyate.js");
+    <pre class="prettyprint"><code>const {Yate, Message} = require("next-yate");
 let yate = new Yate();
 yate.init();
 // callback variant
@@ -1711,7 +1711,7 @@ console.log(ver);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line632">line 632</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line659">line 659</a>
     </li></ul></dd>
     
 
@@ -1860,7 +1860,7 @@ console.log(ver);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line692">line 692</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line719">line 719</a>
     </li></ul></dd>
     
 
@@ -2033,7 +2033,7 @@ In contrast to the method of Yate.install it does not require an answer to messa
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line665">line 665</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line692">line 692</a>
     </li></ul></dd>
     
 
@@ -2071,7 +2071,7 @@ In contrast to the method of Yate.install it does not require an answer to messa
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const {Yate, Message} = require("libyate.js");
+    <pre class="prettyprint"><code>const {Yate, Message} = require("next-yate");
 
 function onTimer(message) {
     concole.log(message.time);
@@ -2105,7 +2105,7 @@ yate.watch(onTimer, "engine.timer");</code></pre>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Sun Jan 26 2020 19:19:32 GMT+0300 (Москва, стандартное время)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Sat Feb 01 2020 22:27:43 GMT+0300 (Москва, стандартное время)
 </footer>
 
 <script> prettyPrint(); </script>

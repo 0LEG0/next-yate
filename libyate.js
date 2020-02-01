@@ -1,7 +1,7 @@
 /**
  * @file "Next-Yate" libyate.js
  * @author Anton <aucyxob@gmail.com>
- * @version 0.1
+ * @version 0.0.1
  * @license Apache-2.0
  * @description <h3>Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine).</h3>
  * It contains two APIs to Yate:<br/>
@@ -37,6 +37,7 @@ const _ACKNOWLEDGE_TIMEOUT = 3000; // default 10000
 const _RECONNECT_TIMEOUT = 10000;
 const _PORT = 5040;
 //const _HOST = "127.0.0.1";
+const _OFFLINE_QUEUE = 100; // default 10
 
 /**
  * Creates compatible API objects Engine and Message
@@ -49,12 +50,14 @@ const _PORT = 5040;
  * @see Engine
  * @see _Message
  * @example
- * const {getEngine} = requre("libyate.js");
+ * const {getEngine} = require("next-yate");
  * const {Engine, Message} = getEngine({host: "127.0.0.1"});
  * Engine.output("Hello World!");
  */
 function getEngine(options) {
 	let _yate = new Yate(options);
+	let _dstream = new DumpStream();
+	let _dconsole = new Console(_dstream);
 
 	if (!_yate._host) console = _yate.getConsole();
 	_yate.on("_debug", console.log);
@@ -89,9 +92,13 @@ function getEngine(options) {
 		 * @memberof _Message
 		 * @instance
 		 * @method dispatch
+		 * @async
 		 * @see Yate#dispatch
 		 */
-		message.dispatch = () => _yate.dispatch(this);
+		message.dispatch = async function() {
+			return _yate.dispatch(this);
+		};
+
 		return message;
 	};
 	//_Message.__proto__ = _yate;
@@ -132,37 +139,26 @@ function getEngine(options) {
 	 * @static
 	 * @see https://docs.yate.ro/wiki/Javascript_Engine
 	 * @example
-	 * const { getEngine } = require("libyate.js");
+	 * const { getEngine } = require("next-yate");
 	 * const { Engine, Message } = getEngine();
 	 * Engine.output("Hello World!");
 	 */
 	const Engine = {
-		DebugFail: 0,
-		0: "FAIL",
-		DebugTest: 1,
-		1: "TEST",
-		DebugCrit: 2,
-		2: "CRIT",
+		DebugFail: 0, 0: "FAIL",
+		DebugTest: 1, 1: "TEST",
+		DebugCrit: 2, 2: "CRIT",
 		DebugGoOn: 2,
-		DebugConf: 3,
-		3: "CONF",
-		DebugStub: 4,
-		4: "STUB",
-		DebugWarn: 5,
-		5: "WARN",
-		DebugMild: 6,
-		6: "MILD",
-		DebugNote: 7,
-		7: "NOTE",
-		DebugCall: 8,
-		8: "CALL",
-		DebugInfo: 9,
-		9: "INFO",
-		DebugAll: 10,
-		10: "ALL"
+		DebugConf: 3, 3: "CONF",
+		DebugStub: 4, 4: "STUB",
+		DebugWarn: 5, 5: "WARN",
+		DebugMild: 6, 6: "MILD",
+		DebugNote: 7, 7: "NOTE",
+		DebugCall: 8, 8: "CALL",
+		DebugInfo: 9, 9: "INFO",
+		DebugAll: 10, 10: "ALL"
 	};
 	//Engine.shared TODO
-	//Engine.name TODO
+	Engine.name = process.argv[1];
 	Engine._debugLevel = 8;
 	Engine._debugName = _yate._trackname;
 	Engine._debug = true;
@@ -176,10 +172,19 @@ function getEngine(options) {
 	Engine.output = (...args) => _yate.output(args.join(" "));
 	/** @method Engine.debug */
 	Engine.debug = (level, ...args) => {
-		if (Engine._debug && Engine._debugLevel >= level)
+		if (typeof level === "number"  && level > -1 && Engine._debug && Engine._debugLevel >= level)
 			Engine.output(new Date().toISOString(),	`<${Engine._debugName}:${Engine[level]}>`, ...args);
 	};
-	//Engine.alarm TODO
+	/** @method Engine.alarm */
+	Engine.alarm = (level, ...args) => {
+		if (typeof level === "string" && typeof args[0] === "number") {
+			level = args[0];
+			args.splice(0, 1);
+		}
+		if (typeof level === "number" && level > -1 && level < 11) {
+			Engine.output(new Date().toISOString(),	`<${Engine._debugName}:${Engine[level]}>`, ...args);
+		}
+	};
 	/**
 	 * @method Engine.sleep
 	 * @param {number} seconds
@@ -203,12 +208,31 @@ function getEngine(options) {
 	Engine.yield = () => {}; // not used
 	Engine.idle = () => {}; // not used
 	//Engine.restart = () => {}; TODO
-	/** @method Engine.dump_r */
-	Engine.dump_r = (...args) =>
-		args.reduce( (prev, item) => (prev += JSON.stringify(item, null, 2)), "");
+	/**
+	 * @method Engine.dump_r
+	 * @async
+	 */
+	Engine.dump_r = (...args) => {
+		// based on JSON.stringify
+		//return args.reduce( (prev, item) => (prev += JSON.stringify(item, null, 2)), "");
+		// based on async console output
+		return new Promise( resolve => {
+			_dstream.once("dump", resolve);
+			_dconsole.log(...args);	
+		});
+	};
 	/** @method Engine.print_r */
 	Engine.print_r = (...args) => _yate.getConsole().log(...args);
-	//Engine.dump_t TODO
+	/**
+	 * @method Engine.dump_t
+	 * @async
+	 */
+	Engine.dump_t = (...args) => {
+		return new Promise( resolve => {
+			_dstream.once("dump", resolve);
+			_dconsole.table(...args);	
+		});
+	};
 	/** @method Engine.print_t */
 	Engine.print_t = (...args) => _yate.getConsole().table(...args);
 	/** @method Engine.debugName */
@@ -279,7 +303,7 @@ function getEngine(options) {
  * @param {boolean} broadcast (not used)
  * @param {Object} params - message parameters (optional, for example {id: "sip/123", caller: "12345", called: "67890"})
  * @example
- * const {Yate, Message} = require("libyate.js");
+ * const {Yate, Message} = require("next-yate");
  * let yate = new Yate();
  * let m = new Message("call.drop", { id: "sip/123", reason: "timeout" });
  * yate.enqueue(m);
@@ -399,7 +423,7 @@ Object.defineProperties(Message.prototype, {
  * @param {number} options.acknowledge_timeout Reply to the message without processing after a specified time, so as not to overload the Yate queue and not cause the engine to crash. (default 3000)
  * @param {number} options.bufsize Sets the maximum size of transferred query data in extmodule. (default 8190).
  * @example
- * const {Yate, Message} = require("libyate.js");
+ * const {Yate, Message} = require("next-yate");
  * let yate = new Yate({host: "127.0.0.1", trackname: "myscript"});
  * yate.init();
  * @see https://docs.yate.ro/wiki/External_module_command_flow
@@ -423,6 +447,7 @@ class Yate extends EventEmitter {
 		this._acknowledge_timeout = options.acknowledge_timeout ? options.acknowledge_timeout : _ACKNOWLEDGE_TIMEOUT;
 		this._bufsize = options.bufsize ? options.bufsize : _BUFFER_SIZE;
 		this._trackname = options.trackname ? options.trackname : _TRACKNAME;
+		this.setMaxListeners(options.queue ? options.queue : _OFFLINE_QUEUE);
 
 		// {name, value}
 		this._setlocals = [
@@ -431,6 +456,7 @@ class Yate extends EventEmitter {
 			{ name: "restart", value: this._reconnect },
 			{ name: "timeout", value: this._acknowledge_timeout }
 		];
+
 		// {callback, name, priority, filter, fvalue}
 		this._installs = [];
 		// {callback, name}
@@ -557,7 +583,7 @@ class Yate extends EventEmitter {
 	 * @param {string} filter - set the filter to message parameter (optional, for example "called")
 	 * @param {string} fvalue - filter value (optional, for example "^9999.*")
 	 * @example
-	 * const {Yate, Message} = require("libyate.js");
+	 * const {Yate, Message} = require("next-yate");
 	 *
 	 * function onRoute(message) {
 	 *     message.retvalue("tone/ring"); // send the incoming call to tone/ring module
@@ -651,7 +677,7 @@ class Yate extends EventEmitter {
 	 * @param {function} callback - function to be message handler (required)
 	 * @param {string} name - message name (required)
 	 * @example
-	 * const {Yate, Message} = require("libyate.js");
+	 * const {Yate, Message} = require("next-yate");
 	 *
 	 * function onTimer(message) {
 	 *     concole.log(message.time);
@@ -712,7 +738,7 @@ class Yate extends EventEmitter {
 	 * @param {string} value - parameter value (optional, if undefined the method returns the parameter value)
 	 * @async
 	 * @example
-	 * const {Yate, Message} = require("libyate.js");
+	 * const {Yate, Message} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
 	 * // callback variant
@@ -781,7 +807,7 @@ class Yate extends EventEmitter {
 	 * @method
 	 * @param {Object} message - Message (required)
 	 * @example
-	 * const {Yate, Message} = require("libyate.js");
+	 * const {Yate, Message} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
 	 * let m = new Message("call.drop", false, { id: "sip/123" });
@@ -798,7 +824,7 @@ class Yate extends EventEmitter {
 	 * @param {Object} msg - Message (required)
 	 * @async
 	 * @example
-	 * const {Yate, Message} = require("libyate.js");
+	 * const {Yate, Message} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
 	 * // callback variant
