@@ -1,6 +1,6 @@
 {
   "name": "next-yate",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine)",
   "main": "libyate.js",
   "scripts": {
@@ -12,11 +12,9 @@
   },
   "keywords": [
     "yate",
-    "nodejs",
+    "libyate",
     "extmodule",
-    "node",
-    "extmod",
-    "libyate"
+    "node"
   ],
   "author": "Anton",
   "license": "Apache-2.0",

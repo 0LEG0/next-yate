@@ -1,7 +1,7 @@
 /**
  * @file "Next-Yate" libyate.js
  * @author Anton <aucyxob@gmail.com>
- * @version 0.0.1
+ * @version 0.0.2
  * @license Apache-2.0
  * @description <h3>Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine).</h3>
  * It contains two APIs to Yate:<br/>
@@ -11,7 +11,7 @@
  * <li> Message </li>
  * </ul>
  * 2. The second compatible API is my attempt to ensure API compatibility with the  Yate's JavaScript module https://docs.yate.ro/wiki/Javascript_module.
- * This API allows you to run scripts written for javascript.yate module in Nodejs enviroment with minimal modifications.
+ * This API allows you to run scripts written for javascript.yate module in Nodejs environment with minimal modifications.
  * To use the compatible API, you need to request following objects from the getEngine function:<br/>
  * <ul>
  * <li> Engine </li>
@@ -166,8 +166,23 @@ function getEngine(options) {
 	 * Returns internal connection object of Yate
 	 * @method Engine.getConnection
 	 * @returns {Yate}
+	 * @see Yate
 	 */
 	Engine.getConnection = () => _yate;
+	/**
+	 * Set/Get Engine specific parameter
+	 * @method Engine.setLocal
+	 * @async
+	 * @see Yate#setlocal
+	 */
+	Engine.setLocal = function(...args) { return _yate.setlocal(...args) } ;
+	/**
+	 * Returns the set of Engine's specific parameters
+	 * @method Engine.getEnvironment
+	 * @async
+	 * @see Yate#getEnvironment
+	 */
+	Engine.getEnvironment = function(...args) { return _yate.getEnvironment(...args) };
 	/** @method Engine.output */
 	Engine.output = (...args) => _yate.output(args.join(" "));
 	/** @method Engine.debug */
@@ -311,12 +326,12 @@ function getEngine(options) {
  */
 class Message {
 	constructor(name, broadcast, params) {
-		if (typeof name !== "string" || name.length < 1) return;
+		if (typeof name !== "string" || name.length < 1) throw new Error("Message name are required!");
 		if (typeof broadcast === "boolean") this._broadcast = broadcast;
 		if (typeof broadcast === "object" && broadcast) params = broadcast;
 		this._name = name;
 		this._time = Math.floor(Date.now() / 1000); //sec
-		this._id = `${this.time}${process.hrtime()[1]}`;
+		this._id = `${this._time}${process.hrtime()[1]}`;
 		this._type = "outgoing";
 		this._processed = false;
 		this.copyParams(params);
@@ -326,18 +341,6 @@ class Message {
 	set name(value) { this._name = value }
 	get broadcast() { return function() { return this._broadcast } } // workaround
 	set broadcast(value) { this._broadcast = value }
-	get id() { return this._id }
-	set id(value) { this._id = value }
-	get type() { return this._type }
-	set type(value) { this._type = value }
-	get time() { return this._time }
-	set time(value) { this._time = value }
-	get processed() { return this._processed }
-	set processed(value) { this._processed = value }
-	get retvalue() { return this._retvalue }
-	set retvalue(value) { this._retvalue = value }
-	get success() { return this._success }
-	set success(value) { this._success = value }
 
 	/**
 	 * @method
@@ -402,6 +405,7 @@ Object.defineProperties(Message.prototype, {
 	getParam: { writable: false },
 	setParam: { writable: false },
 	copyParams: { writable: false },
+	retValue: { writable: false },
 	msgTime: { writable: false },
 	getColumn: { writable: false },
 	getRow: { writable: false },
@@ -441,7 +445,6 @@ class Yate extends EventEmitter {
 		this._port = options.port ? options.port : _PORT;
 		this._path = options.path; // "socket path"
 		this._reconnect = "reconnect" in options ? options.reconnect : true;
-
 		this._reconnnect_timeout = options.reconnnect_timeout ? options.reconnnect_timeout : _RECONNECT_TIMEOUT;
 		this._dispatch_timeout = options.dispatch_timeout ? options.dispatch_timeout : _DISPATCH_TIMEOUT;
 		this._acknowledge_timeout = options.acknowledge_timeout ? options.acknowledge_timeout : _ACKNOWLEDGE_TIMEOUT;
@@ -574,6 +577,51 @@ class Yate extends EventEmitter {
 	}
 
 	/**
+	 * Returns set of connection's specific parameners
+	 * @method
+	 * @example
+	 * { version: '6.1.1',
+	 *   release: 'devel1',
+	 *   nodename: 'svn',
+	 *   runid: '1580736088',
+	 *   configname: 'yate',
+	 *   sharedpath: './share',
+	 *   configpath: './conf.d',
+	 *   cfgsuffix: '.conf',
+	 *   modulepath: './modules',
+	 *   modsuffix: '.yate',
+	 *   logfile: '',
+	 *   clientmode: 'false',
+	 *   supervised: 'false',
+	 *   maxworkers: '10'
+	 * }
+	 * @param {function} callback 
+	 * @async
+	 */
+	getEnvironment(callback) {
+		let env = [ 
+			"version", "release", "nodename", "runid", "configname",
+			"sharedpath", "configpath", "cfgsuffix", "modulepath",
+			"modsuffix", "logfile", "clientmode", "supervised", "maxworkers"
+		];
+		let ans = {};
+
+		return Promise.all(
+			env.map(key => {
+				return new Promise(resolve => {
+					this.setlocal(value => {
+						ans[key] = value;
+						resolve(value);
+					}, "engine." + key);
+				})
+			})
+		).then(() => {
+			if (typeof callback === "function") callback(ans);
+			return ans;
+		});
+	}
+
+	/**
 	 * Sets the handler to a specific message.
 	 * The yate engine will wait for a response to its message.
 	 * @method
@@ -586,7 +634,7 @@ class Yate extends EventEmitter {
 	 * const {Yate, Message} = require("next-yate");
 	 *
 	 * function onRoute(message) {
-	 *     message.retvalue("tone/ring"); // send the incoming call to tone/ring module
+	 *     message.retValue("tone/ring"); // send the incoming call to tone/ring module
 	 * }
 	 *
 	 * let yate = new Yate();
@@ -628,13 +676,13 @@ class Yate extends EventEmitter {
 					return promise(message).then( (ans) => {
 							if (typeof ans === "boolean") {
 								// if answer is boolean -> message.processed -> ack
-								message.processed = ans;
+								message._processed = ans;
 								this._acknowledge(message);
 								return;
 							}
 							if (ans && typeof ans === "object") {
 								// if answer is changed message -> ack
-								if (ans.id === message.id) {
+								if (ans._id === message._id) {
 									this._acknowledge(ans);
 									return;
 								}
@@ -754,17 +802,20 @@ class Yate extends EventEmitter {
             typeof callback === "function" && typeof name === "string" &&
             (typeof value === "string" || typeof value === "boolean" || typeof value === "number" || value === undefined)
         ) {
-			// push or replace to setlocals []
-			if (value !== undefined) {
-				let idx = this._setlocals.length;
-				for (let i = 0; i < this._setlocals.length; i++)
-					if (this._setlocals[i].name === name) {
-						idx = i;
-						break;
+			this.once("_setlocal," + name, (ans) => {
+				// push or replace to setlocals []
+				if (value !== undefined && ans._success) {
+					let idx = this._setlocals.length;
+					for (let i = 0; i < this._setlocals.length; i++) {
+						if (this._setlocals[i].name === name) {
+							idx = i;
+							break;
+						}
 					}
-				this._setlocals[idx] = { name: name, value: value };
-			}
-			this.once("_setlocal," + name, (ans) => { callback(ans)	});
+					this._setlocals[idx] = { name: name, value: value };
+				}
+				callback(ans._success ? ans._retvalue : undefined );
+			});
 			this._setlocal(name, value);
 			return;
 		}
@@ -774,29 +825,29 @@ class Yate extends EventEmitter {
 		) {
 			value = name;
 			name = callback;
-			// push or replace to setlocals []
-			if (value !== undefined) {
-				let idx = this._setlocals.length;
-				for (let i = 0; i < this._setlocals.length; i++)
-					if (this._setlocals[i].name === name) {
-						idx = i;
-						break;
-					}
-				this._setlocals[idx] = { name: name, value: value };
-			}
-
 			return new Promise( (resolve) => {
 				this._setlocal(name, value);
 				let event = "_setlocal," + name;
 				// kill the slow setlocal query by timeout
 				let timeout = setTimeout(() => {
 					this.removeListener(event, resolve);
-					resolve({ name: name, retvalue: value, success: false });
+					resolve(undefined);
 				}, this._dispatch_timeout);
 
-				this.once(event, (m) => {
+				this.once(event, (ans) => {
 					clearTimeout(timeout);
-					resolve(m);
+					// push or replace to setlocals []
+					if (value !== undefined && ans._success) {
+						let idx = this._setlocals.length;
+						for (let i = 0; i < this._setlocals.length; i++) {
+							if (this._setlocals[i].name === name) {
+								idx = i;
+								break;
+							}
+						}
+						this._setlocals[idx] = { name: name, value: value };
+					}
+					resolve(ans._success ? ans._retvalue : undefined );
 				});
 			});
 		}
@@ -853,7 +904,7 @@ class Yate extends EventEmitter {
 					// kill the slow dispatch by timeout
 					let timeout = setTimeout(() => {
 						this.removeListener(event, resolve);
-						msg.processed = false;
+						msg._processed = false;
 						resolve(msg);
 					}, this._dispatch_timeout);
 					this.once(event, (m) => {
@@ -890,22 +941,22 @@ class Yate extends EventEmitter {
 				this.emit(msg._name, msg); // installed
 				break;
 			case "uninstall":
-				this.emit("_uninstall," + msg._name, msg.success);
+				this.emit("_uninstall," + msg._name, msg._success);
 				break;
 			case "notification":
 				this.emit(msg._name, msg); // watched
 				break;
 			case "install":
-				this.emit("_install," + msg._name, msg.success);
+				this.emit("_install," + msg._name, msg._success);
 				break;
 			case "answer":
 				this.emit("_answer," + msg._id, msg); // dispatched
 				break;
 			case "watch":
-				this.emit("_watch," + msg._name, msg.success);
+				this.emit("_watch," + msg._name, msg._success);
 				break;
 			case "unwatch":
-				this.emit("_unwatch," + msg._name, msg.success);
+				this.emit("_unwatch," + msg._name, msg._success);
 		}
 	}
 
@@ -1000,52 +1051,52 @@ function _parseMessage(str) {
 	let params = {};
 	switch (arg[0]) {
 		case "%%>message": // %%>message:<id>:<time>:<name>:<retvalue>[:<key>=<value>...]
-			params.id = arg[1];
-			params.time = arg[2];
-			params.name = arg[3];
-			params.retvalue = _unescape(arg[4]);
-			params.type = "incoming";
+			params._id = arg[1];
+			params._time = arg[2];
+			params._name = arg[3];
+			params._retvalue = _unescape(arg[4]);
+			params._type = "incoming";
 			break;
 		case "%%<message": // %%<message:<id>:<processed>:[<name>]:<retvalue>[:<key>=<value>...]
-			params.id = arg[1];
-			params.processed = _str2bool(arg[2]);
-			params.name = arg[3];
-			params.retvalue = _unescape(arg[4]);
-			params.type = params.id ? "answer" : "notification";
+			params._id = arg[1];
+			params._processed = _str2bool(arg[2]);
+			params._name = arg[3];
+			params._retvalue = _unescape(arg[4]);
+			params._type = params._id ? "answer" : "notification";
 			break;
 		case "%%<install": // %%<install:<priority>:<name>:<success>
-			params.priority = arg[1];
-			params.name = arg[2];
-			params.success = _str2bool(arg[3]);
-			params.type = "install";
+			params._priority = arg[1];
+			params._name = arg[2];
+			params._success = _str2bool(arg[3]);
+			params._type = "install";
 			break;
 		case "%%<uninstall": // %%<uninstall:<priority>:<name>:<success>
-			params.priority = arg[1];
-			params.name = arg[2];
-			params.success = arg[3];
-			params.type = "uninstall";
+			params._priority = arg[1];
+			params._name = arg[2];
+			params._success = arg[3];
+			params._type = "uninstall";
 			break;
 		case "%%<watch": // %%<watch:<name>:<success>
-			params.name = arg[1];
-			params.success = _str2bool(arg[2]);
-			params.type = "watch";
+			params._name = arg[1];
+			params._success = _str2bool(arg[2]);
+			params._type = "watch";
 			break;
 		case "%%<setlocal": // %%<setlocal:<name>:<value>:<success>
-			params.name = arg[1];
-			params.retvalue = _unescape(arg[2]);
-			params.success = _str2bool(arg[3]);
-			params.type = "setlocal";
+			params._name = arg[1];
+			params._retvalue = _unescape(arg[2]);
+			params._success = _str2bool(arg[3]);
+			params._type = "setlocal";
 			break;
 		case "Error in":
 		default:
-			params.type = "error";
-			params.retvalue = str;
+			params._type = "error";
+			params._retvalue = str;
 	}
 	// message param parser
 	if (
-		params.type === "incoming" ||
-		params.type === "answer" ||
-		params.type === "notification"
+		params._type === "incoming" ||
+		params._type === "answer" ||
+		params._type === "notification"
 	) {
 		let par = arg.slice(5);
 		for (let i = 0; i < par.length; i++) {
@@ -1058,7 +1109,7 @@ function _parseMessage(str) {
 		// parent.child -> parent { child }
 		params = _str2obj(params);
 	}
-	return new Message(params.name, params);
+	return new Message(params._name, params);
 }
 
 /*
@@ -1138,6 +1189,7 @@ function _obj2str(obj, rootkey) {
 	let pref = rootkey ? rootkey + "." : "";
 	for (let key in obj) {
 		if (("" + key).charAt(0) === "_") continue;
+		if (typeof obj[key] === "function") continue;
 		if (typeof obj[key] === "object") {
 			let subobj = _obj2str(obj[key], key);
 			for (let subkey in subobj) {
@@ -1194,7 +1246,8 @@ function _str2obj(obj) {
 // object copy
 function _deepCopy(dst, src) {
 	for (let key in src) {
-		if (("" + key).charAt(0) === "_") continue;
+		//if (("" + key).charAt(0) === "_") continue; // don't allow to change _* Message parameter
+		if (typeof src[key] === "function") continue;
 		if (typeof src[key] !== "object") {
 			dst[key] = src[key];
 		} else {

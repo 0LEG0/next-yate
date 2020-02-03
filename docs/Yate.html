@@ -376,7 +376,7 @@ It provides connection to Yate's external module.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line412">line 412</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line415">line 415</a>
     </li></ul></dd>
     
 
@@ -570,7 +570,7 @@ yate.init();</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line838">line 838</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line888">line 888</a>
     </li></ul></dd>
     
 
@@ -720,7 +720,7 @@ console.log(res.retValue());</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line817">line 817</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line867">line 867</a>
     </li></ul></dd>
     
 
@@ -817,7 +817,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line573">line 573</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line575">line 575</a>
     </li></ul></dd>
     
 
@@ -867,6 +867,162 @@ yate.equeue(m);</code></pre>
     <h5>Example</h5>
     
     <pre class="prettyprint"><code>yate.getConsole().log("Find this message in yate's log");</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="getEnvironment"><span class="type-signature">(async) </span>getEnvironment<span class="signature">(callback)</span><span class="type-signature"></span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    Returns set of connection's specific parameners
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>callback</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">function</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line601">line 601</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>{ version: '6.1.1',
+  release: 'devel1',
+  nodename: 'svn',
+  runid: '1580736088',
+  configname: 'yate',
+  sharedpath: './share',
+  configpath: './conf.d',
+  cfgsuffix: '.conf',
+  modulepath: './modules',
+  modsuffix: '.yate',
+  logfile: '',
+  clientmode: 'false',
+  supervised: 'false',
+  maxworkers: '10'
+}</code></pre>
 
 
 
@@ -977,7 +1133,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line498">line 498</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line500">line 500</a>
     </li></ul></dd>
     
 
@@ -1213,7 +1369,7 @@ The yate engine will wait for a response to its message.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line599">line 599</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line646">line 646</a>
     </li></ul></dd>
     
 
@@ -1256,7 +1412,7 @@ The yate engine will wait for a response to its message.
     <pre class="prettyprint"><code>const {Yate, Message} = require("next-yate");
 
 function onRoute(message) {
-    message.retvalue("tone/ring"); // send the incoming call to tone/ring module
+    message.retValue("tone/ring"); // send the incoming call to tone/ring module
 }
 
 let yate = new Yate();
@@ -1372,7 +1528,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line874">line 874</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line924">line 924</a>
     </li></ul></dd>
     
 
@@ -1555,7 +1711,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line752">line 752</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line799">line 799</a>
     </li></ul></dd>
     
 
@@ -1711,7 +1867,7 @@ console.log(ver);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line659">line 659</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line706">line 706</a>
     </li></ul></dd>
     
 
@@ -1860,7 +2016,7 @@ console.log(ver);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line719">line 719</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line766">line 766</a>
     </li></ul></dd>
     
 
@@ -2033,7 +2189,7 @@ In contrast to the method of Yate.install it does not require an answer to messa
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line692">line 692</a>
+        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line739">line 739</a>
     </li></ul></dd>
     
 
@@ -2105,7 +2261,7 @@ yate.watch(onTimer, "engine.timer");</code></pre>
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Sat Feb 01 2020 22:27:43 GMT+0300 (Москва, стандартное время)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Mon Feb 03 2020 20:05:05 GMT+0300 (Москва, стандартное время)
 </footer>
 
 <script> prettyPrint(); </script>

@@ -20,7 +20,7 @@ It contains two APIs to Yate:
 - Cache of all requests in offline mode.
 - Auto-acknowledge of the incoming messages by acknowledge_timeout. (This can be critical under high load, as it prevents Yate from crashing).
 
-[API description /doc](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/doc/index.html)
+[API description /doc](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
 
 https://docs.yate.ro/wiki/Javascript_Reference
 
@@ -31,10 +31,10 @@ https://docs.yate.ro/wiki/External_module_command_flow
 
 | API                   | javascrip.yate | next-yate | (\*)       |
 | :-------------------- | :------------- | :-------- | :--------- |
-| Message.install       | yes            | yes       |            |
-| Message.uninstall     | yes            | yes       |            |
 | Message.watch         | -              | yes       |            |
 | Message.unwatch       | -              | yes       |            |
+| Message.install       | yes            | yes       |            |
+| Message.uninstall     | yes            | yes       |            |
 | Message.enqueue       | yes            | yes       | _void_     |
 | Message.dispatch      | yes            | yes       | _async_    |
 | Message.handlers      | yes            | -         |            |
@@ -189,6 +189,6 @@ $NODE $SCRIPTS/$1
 ```
 
 
-[API Description /doc](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/doc/index.html)
+[API Description /docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
 
 [Examples /examples](https://github.com/0LEG0/next-yate/tree/master/examples)
