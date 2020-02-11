@@ -11,8 +11,7 @@ Math.random = (min, max) => Math.floor(_backup() * (max - min) + min);
 
 // Constructor
 function Eliza(name) {
-	if (!name)
-		// if (name == "")
+	if (!name) // if (name == "")
 		name = "Eliza";
 	this.name = name;
 	this.wTopic = ""; // Last worthy response - upcase and padded

@@ -1,6 +1,6 @@
 {
   "name": "next-yate",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine)",
   "main": "libyate.js",
   "scripts": {
@@ -21,7 +21,7 @@
   "bugs": {
     "url": "https://github.com/0LEG0/next-yate/issues"
   },
-  "homepage": "https://github.com/0LEG0/next-yate#readme",
+  "homepage": "https://github.com/0LEG0/next-yate",
   "devDependencies": {
     "eslint": "^6.8.0"
   }

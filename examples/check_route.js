@@ -8,9 +8,9 @@
  * >route 99991001
  */
 
-const { Yate, Message } = require("next-yate");
+const { Yate, YateMessage } = require("next-yate");
 
-let yate = new Yate({host: "127.0.0.1", debug: true});
+let yate = new Yate({host: "127.0.0.1"});
 yate.init();
 
 async function onCommand(msg) {
@@ -28,7 +28,7 @@ async function onCommand(msg) {
     if (command !== "route") return;
 
     // find route
-    let call_route = new Message("call.route", {called: called});
+    let call_route = new YateMessage("call.route", {called: called});
     let start_at = Date.now();
     let route_result = await yate.dispatch(call_route);
     let duration = Date.now() - start_at;

@@ -28,9 +28,8 @@
 
 // Adapted to Nodejs by Anton <aucyxob@gmail.com>
 const { chatWithBot } = require("libchatbot.js"); // #require "libchatbot.js"
-const { getEngine } = require("next-yate");
-const { Engine, Message } = getEngine(); //load compatible API objects
-global.Engine = Engine;
+const { Engine, Message } = require("next-yate").getEngine(); //load compatible API objects
+global.Engine = Engine;   //
 global.Message = Message; // share Engine and Message with other modules.
 
 function onCommand(msg) {

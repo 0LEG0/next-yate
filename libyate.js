@@ -1,14 +1,14 @@
 /**
  * @file "Next-Yate" libyate.js
  * @author Anton <aucyxob@gmail.com>
- * @version 0.0.2
+ * @version 0.0.3
  * @license Apache-2.0
  * @description <h3>Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine).</h3>
  * It contains two APIs to Yate:<br/>
  * 1. The first core API is, in fact, the Nodejs version rewritten from the official PHP library libyate.php and represented by classes:<br/>
  * <ul>
  * <li> Yate </li>
- * <li> Message </li>
+ * <li> YateMessage </li>
  * </ul>
  * 2. The second compatible API is my attempt to ensure API compatibility with the  Yate's JavaScript module https://docs.yate.ro/wiki/Javascript_module.
  * This API allows you to run scripts written for javascript.yate module in Nodejs environment with minimal modifications.
@@ -46,12 +46,11 @@ const _OFFLINE_QUEUE = 100; // default 10
  * @function
  * @global
  * @param {Object} options - options for network connection
- * @returns {(Engine|_Message)} {Engine, Message}
+ * @returns {(Engine|Message)} {Engine, Message}
  * @see Engine
- * @see _Message
+ * @see Message
  * @example
- * const {getEngine} = require("next-yate");
- * const {Engine, Message} = getEngine({host: "127.0.0.1"});
+ * const {Engine, Message} = require("next-yate").getEngine({host: "127.0.0.1"});
  * Engine.output("Hello World!");
  */
 function getEngine(options) {
@@ -64,32 +63,34 @@ function getEngine(options) {
 	_yate.init();
 
 	/**
-	 * _Message is part of compatible API.
-	 * Unlike Message class of core API it has static methods: install, watch, uninstall, unwatch and own methods: enqueue and dispatch.
+	 * Compatible API class Message.
+	 * Unlike YateMessage class of core API it has static methods: install, watch, uninstall, unwatch and own methods: enqueue and dispatch.
 	 * @constructs
-	 * @name _Message
-	 * @param {string} name - name of message (required)
+	 * @namespace Message
+	 * @param {string} name - message name (required)
 	 * @param {boolean} broadcast - (not used)
 	 * @param {Object} params - paramerers (optional)
 	 * @returns {Message}
-	 * @see https://docs.yate.ro/wiki/Javascript_Message
-	 * @see getEngine
 	 * @example
-	 * const {Engine, Message} = getEngine();
+	 * const {Engine, Message} = require("next-yate").getEngine();
 	 * let m = new Message("engine.status");
 	 * let status = await m.dispatch();
+	 * @see https://docs.yate.ro/wiki/Javascript_Message
+	 * @see getEngine
+	 * @see YateMessage
 	 */
-	const _Message = function(name, broadcast, params) {
-		let message = new Message(name, broadcast, params);
+	const Message = function(name, broadcast, params) {
+		let message = new YateMessage(name, broadcast, params);
+
 		/**
-		 * @memberof _Message
+		 * @memberof Message
 		 * @instance
 		 * @method enqueue
 		 * @see Yate#enqueue
 		 */
 		message.enqueue = () => _yate.enqueue(this);
 		/**
-		 * @memberof _Message
+		 * @memberof Message
 		 * @instance
 		 * @method dispatch
 		 * @async
@@ -101,35 +102,35 @@ function getEngine(options) {
 
 		return message;
 	};
-	//_Message.__proto__ = _yate;
+	//Message.__proto__ = _yate;
 	/**
-	 * @method _Message.install
+	 * @method Message.install
 	 * @see Yate#install
 	 */
-	_Message.install = (...args) => _yate.install(...args);
+	Message.install = (...args) => _yate.install(...args);
 	/**
-	 * @method _Message.uninstall
+	 * @method Message.uninstall
 	 * @see Yate#uninstall
 	 */
-	_Message.uninstall = (...args) => _yate.uninstall(...args);
+	Message.uninstall = (...args) => _yate.uninstall(...args);
 	/**
-	 * @method _Message.watch
+	 * @method Message.watch
 	 * @see Yate#watch
 	 */
-	_Message.watch = (...args) => _yate.watch(...args);
+	Message.watch = (...args) => _yate.watch(...args);
 	/**
-	 * @method _Message.unwatch
+	 * @method Message.unwatch
 	 * @see Yate#unwatch
 	 */
-	_Message.unwatch = (...args) => _yate.unwatch(...args);
-	//_Message.handlers; TODO
-	//_Message.installHook; TODO
-	//_Message.uninstallHook; TODO
+	Message.unwatch = (...args) => _yate.unwatch(...args);
+	//Message.handlers; TODO
+	//Message.installHook; TODO
+	//Message.uninstallHook; TODO
 	/**
-	 * @method _Message.trackName
+	 * @method Message.trackName
 	 * @see Yate#setlocal
 	 */
-	_Message.trackName = (arg) => {
+	Message.trackName = (arg) => {
 		_yate.setlocal( () => {	_yate._trackname = arg	}, "trackparam", arg );
 	};
 
@@ -139,8 +140,7 @@ function getEngine(options) {
 	 * @static
 	 * @see https://docs.yate.ro/wiki/Javascript_Engine
 	 * @example
-	 * const { getEngine } = require("next-yate");
-	 * const { Engine, Message } = getEngine();
+	 * const {Engine, Message} = require("next-yate").getEngine();
 	 * Engine.output("Hello World!");
 	 */
 	const Engine = {
@@ -307,24 +307,24 @@ function getEngine(options) {
 	//Engine.btoh TODO
 	//Engine.htob TODO
 
-	return { Engine, Message: _Message };
+	return { Engine, Message };
 }
 
 /**
- * Message class is part of core API.
- * Unlike _Message class of compatible API does not contain static methods install/uninstall/watch/unwatch and methods enqueue and dispatch.
+ * Core API YateMessage class.
+ * Unlike Message class of compatible API does not contain static methods install/uninstall/watch/unwatch and methods enqueue and dispatch.
  * @class
  * @param {string} name - message name (required)
  * @param {boolean} broadcast (not used)
  * @param {Object} params - message parameters (optional, for example {id: "sip/123", caller: "12345", called: "67890"})
  * @example
- * const {Yate, Message} = require("next-yate");
+ * const {Yate, YateMessage} = require("next-yate");
  * let yate = new Yate();
- * let m = new Message("call.drop", { id: "sip/123", reason: "timeout" });
+ * let m = new YateMessage("call.drop", { id: "sip/123", reason: "timeout" });
  * yate.enqueue(m);
  * @see https://docs.yate.ro/wiki/Javascript_Message
  */
-class Message {
+class YateMessage {
 	constructor(name, broadcast, params) {
 		if (typeof name !== "string" || name.length < 1) throw new Error("Message name are required!");
 		if (typeof broadcast === "boolean") this._broadcast = broadcast;
@@ -333,14 +333,16 @@ class Message {
 		this._time = Math.floor(Date.now() / 1000); //sec
 		this._id = `${this._time}${process.hrtime()[1]}`;
 		this._type = "outgoing";
-		this._processed = false;
-		this.copyParams(params);
+		this._handled = false;
+		this.copyParams(params, "", false);
 	}
 
 	get name() { return function() { return this._name } } // workaround
-	set name(value) { this._name = value }
+	set name(value) { this._name = typeof value === "string" ? value : this._name }
 	get broadcast() { return function() { return this._broadcast } } // workaround
 	set broadcast(value) { this._broadcast = value }
+	get handled() { return this._handled }
+	set handled(value) { this._handled = typeof value === "boolean" ? value : this._handled }
 
 	/**
 	 * @method
@@ -369,19 +371,18 @@ class Message {
 	/**
 	 * @method
 	 * @param {Object} obj - object from which to copy properties (except objects, null and undefined)
-	 * @param {string} prefix - (not used)
-	 * @param {string} skip - (not used)
+	 * @param {string} prefix - parameters begins with prefix
+	 * @param {string} skip - will be ignored
 	 */
-	copyParams(obj) {
-		// TODO copyParams(obj, prefix, skip)
-		/* TODO:
+	copyParams(obj, prefix, skip) {
+		/*
 		 * obj - object from which to copy properties (except objects, null and undefined)
 		 * prefix - optional parameter to specify that only properties that a key with the given index should be copied. If the prefix represents an object, the properties of that object will be copied.
 		 * skip - optional parameter (assumed, by default, to be true) to specifies if the prefix should be copied or eliminated from the key being copied.
 		 */
 		if (!obj) return;
 		if (typeof obj !== "object") return;
-		_deepCopy(this, obj);
+		_deepCopy(this, obj, prefix, skip);
 	}
 	/**
 	 * @method
@@ -401,7 +402,7 @@ class Message {
 	getRow() {} // TODO
 	getResult() {} // TODO
 }
-Object.defineProperties(Message.prototype, {
+Object.defineProperties(YateMessage.prototype, {
 	getParam: { writable: false },
 	setParam: { writable: false },
 	copyParams: { writable: false },
@@ -413,7 +414,7 @@ Object.defineProperties(Message.prototype, {
 });
 
 /**
- * Yate class is part of core API.
+ * Core API Yate class.
  * It provides connection to Yate's external module.
  * @class Yate
  * @param {Object} options (optional)
@@ -427,7 +428,7 @@ Object.defineProperties(Message.prototype, {
  * @param {number} options.acknowledge_timeout Reply to the message without processing after a specified time, so as not to overload the Yate queue and not cause the engine to crash. (default 3000)
  * @param {number} options.bufsize Sets the maximum size of transferred query data in extmodule. (default 8190).
  * @example
- * const {Yate, Message} = require("next-yate");
+ * const {Yate, YateMessage} = require("next-yate");
  * let yate = new Yate({host: "127.0.0.1", trackname: "myscript"});
  * yate.init();
  * @see https://docs.yate.ro/wiki/External_module_command_flow
@@ -561,7 +562,7 @@ class Yate extends EventEmitter {
 			this.removeAllListeners(item.name);
 			this.watch(item.callback, item.name, item.priority, item.filter, item.fvalue);
 		});
-		this.emit("_connect"); //setTimeout(() => { this.emit("_connect") }, 100);
+		this.emit("_connect");
 		if (typeof callback === "function") callback();
 	}
 
@@ -579,8 +580,12 @@ class Yate extends EventEmitter {
 	/**
 	 * Returns set of connection's specific parameners
 	 * @method
+	 * @async
+	 * @param {function} callback
 	 * @example
-	 * { version: '6.1.1',
+	 * yate.getEnvironment(console.log);
+	 * {
+	 *   version: '6.1.1',
 	 *   release: 'devel1',
 	 *   nodename: 'svn',
 	 *   runid: '1580736088',
@@ -595,8 +600,6 @@ class Yate extends EventEmitter {
 	 *   supervised: 'false',
 	 *   maxworkers: '10'
 	 * }
-	 * @param {function} callback 
-	 * @async
 	 */
 	getEnvironment(callback) {
 		let env = [ 
@@ -622,6 +625,16 @@ class Yate extends EventEmitter {
 	}
 
 	/**
+	 * Acknowledges the message
+	 * Not needed in common cases because of all incoming messages acknowledges automatically 
+	 * @method
+	 * @param {YateMessage} message 
+	 */
+	acknowledge(msg) {
+		if (typeof msg === "object" && msg._type === "incoming") { this._acknowledge(msg) }
+	}
+
+	/**
 	 * Sets the handler to a specific message.
 	 * The yate engine will wait for a response to its message.
 	 * @method
@@ -631,7 +644,7 @@ class Yate extends EventEmitter {
 	 * @param {string} filter - set the filter to message parameter (optional, for example "called")
 	 * @param {string} fvalue - filter value (optional, for example "^9999.*")
 	 * @example
-	 * const {Yate, Message} = require("next-yate");
+	 * const {Yate, YateMessage} = require("next-yate");
 	 *
 	 * function onRoute(message) {
 	 *     message.retValue("tone/ring"); // send the incoming call to tone/ring module
@@ -640,11 +653,16 @@ class Yate extends EventEmitter {
 	 * let yate = new Yate();
 	 * yate.init();
 	 * yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler to "call.route" messages where parameter message.called begins with "9999", handler has priority 90
-	 * @see Message
+	 * @see YateMessage
 	 * @see https://docs.yate.ro/wiki/Standard_Messages
 	 */
 	install(callback, name, priority, filter, fvalue) {
 		if (typeof callback === "function" && typeof name === "string") {
+			if (typeof priority !== "number") {
+				fvalue = typeof filter === "string" ? filter : undefined;
+				filter = typeof priority === "string" ? priority : undefined;
+				priority = 100;
+			}
 			// 1. query yate to install the handler
 			this._install(name, priority, filter, fvalue);
 			// 2. waiting for answer
@@ -671,12 +689,12 @@ class Yate extends EventEmitter {
 					let calltype = Object.getPrototypeOf(callback).constructor.name;
 					let promise; // it can be promise
 					if (calltype === "AsyncFunction" || calltype === "Promise")	promise = callback;
-					else promise = (msg) =>	new Promise( (resolve) => { resolve(callback(msg))	});
+					else promise = (msg) =>	new Promise( (resolve) => { resolve(callback(msg)) });
 					// 5. attach acknowledge
 					return promise(message).then( (ans) => {
 							if (typeof ans === "boolean") {
 								// if answer is boolean -> message.processed -> ack
-								message._processed = ans;
+								message._handled = ans;
 								this._acknowledge(message);
 								return;
 							}
@@ -692,7 +710,7 @@ class Yate extends EventEmitter {
 						}).catch(() => this._acknowledge(message)); // ...on error too
 				});
 			});
-		}
+		} else throw new Error("Install message handler error!\nMethod install(callback, name, priority, filter, fvalue)");
 	}
 
 	/**
@@ -715,7 +733,7 @@ class Yate extends EventEmitter {
 					}
 			});
 			this._uninstall(name);
-		}
+		} else throw new Error("Uninstall message handler error!\nMethod uinstall(name)");
 	}
 
 	/**
@@ -735,6 +753,7 @@ class Yate extends EventEmitter {
 	 * yate.init();
 	 * yate.watch(onTimer, "engine.timer");
 	 * @see https://docs.yate.ro/wiki/Standard_Messages
+	 * @see Yate#install
 	 */
 	watch(callback, name) {
 		if (typeof callback === "function" && typeof name === "string") {
@@ -752,7 +771,7 @@ class Yate extends EventEmitter {
 				//
 			});
 			this._watch(name);
-		}
+		} else throw new Error("Watch message handler error!\nMethod watch(callback, name)");
 	}
 
 	/**
@@ -775,7 +794,7 @@ class Yate extends EventEmitter {
 					}
 			});
 			this._unwatch(name);
-		}
+		} else throw new Error("Unwatch message handler error!\nMethod unwatch(name)");
 	}
 
 	/**
@@ -786,7 +805,7 @@ class Yate extends EventEmitter {
 	 * @param {string} value - parameter value (optional, if undefined the method returns the parameter value)
 	 * @async
 	 * @example
-	 * const {Yate, Message} = require("next-yate");
+	 * const {Yate, YateMessage} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
 	 * // callback variant
@@ -856,34 +875,34 @@ class Yate extends EventEmitter {
 	/**
 	 * Enqueues the Message in the Yate engine
 	 * @method
-	 * @param {Object} message - Message (required)
+	 * @param {YateMessage} message (required)
 	 * @example
-	 * const {Yate, Message} = require("next-yate");
+	 * const {Yate, YateMessage} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
-	 * let m = new Message("call.drop", false, { id: "sip/123" });
+	 * let m = new YateMessage("call.drop", false, { id: "sip/123" });
 	 * yate.equeue(m);
+	 * @see Yate#dispatch
 	 */
-	enqueue(message) {
-		this._dispatch(message);
-	}
+	enqueue(message) { this._dispatch(message) }
 
 	/**
 	 * Dispatches the Message in the Yate engine
 	 * @method
 	 * @param {Function} callback - Callback function (optional, if undefined returns promisyfied value)
-	 * @param {Object} msg - Message (required)
+	 * @param {YateMessage} message (required)
 	 * @async
 	 * @example
-	 * const {Yate, Message} = require("next-yate");
+	 * const {Yate, YateMessage} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
 	 * // callback variant
-	 * let m = new Message("call.route", false, { id: "test/1", caller: "123", called: "321" });
+	 * let m = new YateMessage("call.route", false, { id: "test/1", caller: "123", called: "321" });
 	 * yate.dispatch(res => console.log(res.retValue()), m); // Output to console call.route request result
 	 * // or async/await variant
 	 * let res = await yate.dispatch(m);
 	 * console.log(res.retValue());
+	 * @see Yate#enqueue
 	 */
 	dispatch(callback, msg) {
 		// callback version
@@ -904,7 +923,7 @@ class Yate extends EventEmitter {
 					// kill the slow dispatch by timeout
 					let timeout = setTimeout(() => {
 						this.removeListener(event, resolve);
-						msg._processed = false;
+						msg._handled = false;
 						resolve(msg);
 					}, this._dispatch_timeout);
 					this.once(event, (m) => {
@@ -995,7 +1014,7 @@ class Yate extends EventEmitter {
 	// %%<message:<id>:<processed>:[<name>]:<retvalue>[:<key>=<value>...]
 	_acknowledge(msg) {
 		if (msg._type !== "incoming") return;
-		this._write("%%<message:" + _escape(msg._id) + ":" + _bool2str(msg._processed) + "::" + _escape(msg._retvalue) + _par2str(msg));
+		this._write("%%<message:" + _escape(msg._id) + ":" + _bool2str(msg._handled) + "::" + _escape(msg._retvalue) + _par2str(msg));
 	}
 
 	// %%>setlocal:<name>:<value>
@@ -1059,7 +1078,7 @@ function _parseMessage(str) {
 			break;
 		case "%%<message": // %%<message:<id>:<processed>:[<name>]:<retvalue>[:<key>=<value>...]
 			params._id = arg[1];
-			params._processed = _str2bool(arg[2]);
+			params._handled = _str2bool(arg[2]);
 			params._name = arg[3];
 			params._retvalue = _unescape(arg[4]);
 			params._type = params._id ? "answer" : "notification";
@@ -1109,7 +1128,7 @@ function _parseMessage(str) {
 		// parent.child -> parent { child }
 		params = _str2obj(params);
 	}
-	return new Message(params._name, params);
+	return new YateMessage(params._name, params);
 }
 
 /*
@@ -1244,9 +1263,9 @@ function _str2obj(obj) {
 }
 
 // object copy
-function _deepCopy(dst, src) {
+function _deepCopy(dst, src, prefix = "_", skip = true) {
 	for (let key in src) {
-		//if (("" + key).charAt(0) === "_") continue; // don't allow to change _* Message parameter
+		if (key.startsWith(prefix) && skip) continue;
 		if (typeof src[key] === "function") continue;
 		if (typeof src[key] !== "object") {
 			dst[key] = src[key];
@@ -1260,6 +1279,6 @@ function _deepCopy(dst, src) {
 
 module.exports = {
 	getEngine,
-	Message,
-	Yate
+	Yate,
+	YateMessage
 };

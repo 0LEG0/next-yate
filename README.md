@@ -1,4 +1,4 @@
-# Next-Yate (Experimental)
+# Next-Yate _(experimental)_
 
 ## Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine).
 
@@ -6,7 +6,7 @@ It contains two APIs to Yate:
 
 1. The first **core API** is, in fact, the rewritten Nodejs version of the official PHP library libyate.php which is represented by following classes:
     - **Yate**
-    - **Message**
+    - **YateMessage**
 
 2. The second **compatible API** is my attempt to ensure API compatibility with the  Yate's JavaScript module (https://docs.yate.ro/wiki/Javascript_module). This API allows you to run scripts written for javascript.yate module in Nodejs enviroment with minimal modifications. To use the compatible API, you need to request following objects from the **getEngine** function:
     - **Engine**
@@ -20,17 +20,16 @@ It contains two APIs to Yate:
 - Cache of all requests in offline mode.
 - Auto-acknowledge of the incoming messages by acknowledge_timeout. (This can be critical under high load, as it prevents Yate from crashing).
 
-[API description /doc](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
-
-https://docs.yate.ro/wiki/Javascript_Reference
-
-https://docs.yate.ro/wiki/External_module_command_flow
+[API description /docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
+[javascript.yate API](https://docs.yate.ro/wiki/Javascript_Reference)
+[External module protocol](https://docs.yate.ro/wiki/External_module_command_flow)
 
 
 ## Compatibility table
 
 | API                   | javascrip.yate | next-yate | (\*)       |
 | :-------------------- | :------------- | :-------- | :--------- |
+| Message.acknowledge   | -              | yes       |            |
 | Message.watch         | -              | yes       |            |
 | Message.unwatch       | -              | yes       |            |
 | Message.install       | yes            | yes       |            |
@@ -141,24 +140,28 @@ myscript.sh=           ; Custom shell wrapper around Nodejs script
 node.sh=my_script.js    ; Run my_script.js with example wrapper: examples/node.sh
 ```
 
+### Install
+```
+npm install next-yate
+```
+
 ### Network connected script
 
 example_core_api.js:
 
 ```javascript
 // Core API
-const { Yate, Message } = require("next-yate");
+const { Yate, YateMessage } = require("next-yate");
 let yate = new Yate({ host: "127.0.0.1" });
 
 yate.init(() => console.log("Connected")); // Initialize connection before use
 yate.output("Hello World!");
 ```
-exapmle_compatible_api.js:
+example_compatible_api.js:
 
 ```javascript
 // Compatible API
-const { getEngine } = require("next-yate");
-const { Engine, Message } = getEngine({ host: "127.0.0.1" });
+const { Engine, Message } = require("next-yate").getEngine({ host: "127.0.0.1" });
 
 Engine.output("Hello World!");
 ```
@@ -188,7 +191,9 @@ NODE=`which node`
 $NODE $SCRIPTS/$1
 ```
 
+### Examples
+[/examples](https://github.com/0LEG0/next-yate/tree/master/examples)
 
-[API Description /docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
-
-[Examples /examples](https://github.com/0LEG0/next-yate/tree/master/examples)
+### API
+[/docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
+[javascript.yate API](https://docs.yate.ro/wiki/Javascript_Reference)
