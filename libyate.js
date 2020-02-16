@@ -623,9 +623,7 @@ class Yate extends EventEmitter {
 		const channel = {
 			peerid: null,
 			id: _yate._trackname + "/" + Date.now(),
-			status: null,
-			//queue: new Array
-			counter: 1
+			status: null
 		};
 		/** @method Channel.ringing */
 		channel.ringing = (params) => {
@@ -667,8 +665,6 @@ class Yate extends EventEmitter {
 				attach.consumer = "wave/record/-";
 			}
 			if (typeof params === "object") attach.copyParams(params);
-			//channel.queue.push(attach);
-			//if (channel.queue.length === 1) channel._notify({targetid: channel.id});
 			return new Promise(resolve => {
 				_yate.once("chan.notify", (msg) => {
 					if (msg.targetid === channel.id) resolve(msg);
@@ -685,16 +681,10 @@ class Yate extends EventEmitter {
 				callto: dst
 			});
 			if (typeof params === "object") execute.copyParams(params);
-			//channel.queue.push(execute);
-			//if (channel.queue.length === 1) channel._notify({id: channel.id});
 			_yate.enqueue(execute);
 			setTimeout(() => {process.exit(0)}, 3);
 		};
-		channel._notify = () => {
-			//if (channel.queue.length > 0 && message.targetid === channel.id) {
-			//	_yate.dispatch(() => { channel.queue.splice(0, 1) }, channel.queue[0]);
-			//}
-		};
+
 		/** 
 		 * @method Channel.init
 		 * @async
@@ -706,7 +696,7 @@ class Yate extends EventEmitter {
 		channel.init = (callback, params) => {
 			if (channel.peerid) return;
 			_yate.setlocal("id", channel.id);
-			_yate.install(channel._notify, "chan.notify", 100, "targetid", channel.id);
+			_yate.install(() => {}, "chan.notify", 100, "targetid", channel.id);
 			return new Promise( resolve => {
 				_yate.once("call.execute", (message) => {
 					channel.peerid = message.id;
