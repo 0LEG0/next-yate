@@ -29,7 +29,7 @@
             <pre class="prettyprint source linenums"><code>/**
  * @file "Next-Yate" libyate.js
  * @author Anton &lt;aucyxob@gmail.com>
- * @version 0.0.3
+ * @version 0.0.4
  * @license Apache-2.0
  * @description &lt;h3>Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine).&lt;/h3>
  * It contains two APIs to Yate:&lt;br/>
@@ -44,6 +44,7 @@
  * &lt;ul>
  * &lt;li> Engine &lt;/li>
  * &lt;li> Message &lt;/li>
+ * &lt;li> Channel &lt;/li>
  * &lt;/ul>
  * @see https://github.com/0LEG0/next-yate
  * @see https://docs.yate.ro/wiki/Javascript_Reference
@@ -190,6 +191,7 @@ function getEngine(options) {
 	Engine._debugLevel = 8;
 	Engine._debugName = _yate._trackname;
 	Engine._debug = true;
+	Engine.initChannel = (options) => { return _yate.initChannel(options) };
 	/**
 	 * Returns internal connection object of Yate
 	 * @method Engine.getConnection
@@ -334,8 +336,26 @@ function getEngine(options) {
 	//Engine.htoa TODO
 	//Engine.btoh TODO
 	//Engine.htob TODO
+	/**
+	 * @namespace Channel
+	 * @description Channel object is only available in direct script execution mode from callto context with '{channel: true}' option.
+	 * @example
+	 * regexroute.conf:
+	 * ^NNN=extmodule/nodata/node.sh example.js
+	 * 
+	 * example.js
+	 * const {Engine, Message, Channel} = require("next-yate").getEngine({channel: true});
+	 * Channel.init(main, {autoring: true});
+	 * async function main(message) {
+	 *     await Channel.callTo("wave/play/./share/sounds/welcome.au");
+	 *     await Channel.answered();
+	 *     Channel.callJust("conf/333", {"lonely": true});
+	 * }
+	 * @see http://docs.yate.ro/wiki/Javascript_IVR_example
+	 */
+	const Channel = _yate._channel;
 
-	return { Engine, Message };
+	return { Engine, Message, Channel };
 }
 
 /**
@@ -455,6 +475,8 @@ Object.defineProperties(YateMessage.prototype, {
  * @param {number} options.dispatch_timeout Drops the response from Yate after dispatch_timeout in milliseconds, so that your code does not hang waiting endlessly for an answer. (default 3000)
  * @param {number} options.acknowledge_timeout Reply to the message without processing after a specified time, so as not to overload the Yate queue and not cause the engine to crash. (default 3000)
  * @param {number} options.bufsize Sets the maximum size of transferred query data in extmodule. (default 8190).
+ * @param {boolean} options.channel Direct run the script in channel mode ^NNN=extmodule/nodata/node.sh example.js
+ * @see Yate#toChannel
  * @example
  * const {Yate, YateMessage} = require("next-yate");
  * let yate = new Yate({host: "127.0.0.1", trackname: "myscript"});
@@ -479,6 +501,7 @@ class Yate extends EventEmitter {
 		this._acknowledge_timeout = options.acknowledge_timeout ? options.acknowledge_timeout : _ACKNOWLEDGE_TIMEOUT;
 		this._bufsize = options.bufsize ? options.bufsize : _BUFFER_SIZE;
 		this._trackname = options.trackname ? options.trackname : _TRACKNAME;
+		this._channel = "channel" in options ? options.channel : false;
 		this.setMaxListeners(options.queue ? options.queue : _OFFLINE_QUEUE);
 
 		// {name, value}
@@ -506,7 +529,6 @@ class Yate extends EventEmitter {
 			this.out = process.stdout;
 			this._reconnect = false;
 			console = this._console; // console -> Yate.output
-			this._restore();
 		} else {
 			// do not reconnect on exit
 			process.on("SIGINT", () => {
@@ -527,6 +549,7 @@ class Yate extends EventEmitter {
 	 * yate.init(function() { console.log("Connnected") });
 	 */
 	init(callback) {
+		if (this._channel) return this.toChannel();
 		if (!this._host) {
 			// local start
 			this._restore(callback); // &lt;-- start here
@@ -592,6 +615,151 @@ class Yate extends EventEmitter {
 		});
 		this.emit("_connect");
 		if (typeof callback === "function") callback();
+	}
+
+	/**
+	 * Alternative initialization of script running from route context
+	 * @method
+	 * @async
+	 * @returns {Object} Channel
+	 * @example
+	 * regexroute.conf:
+	 * ^NNN=extmodule/nodata/node.sh example.js
+	 * 
+	 * example.js:
+	 * const {Yate} = require("next-yate");
+	 * const yate = new Yate();
+	 * const Channel = yate.toChannel();
+	 * Channel.init(main, {autoanswer: true});
+	 * 
+	 * function main(message) {
+	 *     if (message.called=="32843")
+	 *         Channel.callJust("wave/play/./share/sounds/welcome.au");
+	 * }
+	 */
+	toChannel() {
+		if (typeof this._channel === "object") return this._channel;
+		if (this._host || this._connected) return;
+		this._reconnect = false;
+		this._connected = true;
+		const _yate = this;
+
+		/*
+		 * @namespace Channel
+		 * @see Yate#toChannel
+		 */
+		const channel = {
+			peerid: null,
+			id: _yate._trackname + "/" + Date.now(),
+			status: null,
+			//queue: new Array
+			counter: 1
+		};
+		/** @method Channel.ringing */
+		channel.ringing = (params) => {
+			let ringing = new YateMessage("call.ringing", {
+				id: channel.id,
+				targetid: channel.peerid,
+				earlymedia: true
+			});
+			channel.status = "ringing";
+			if (typeof params === "object") ringing.copyParams(params);
+			return _yate.dispatch(ringing);
+		};
+		/** @method Channel.answered */
+		channel.answered = (params) => {
+			let answered = new YateMessage("call.answered", {
+				id: channel.id,
+				targetid: channel.peerid
+			});
+			channel.status = "answered";
+			if (typeof params === "object") answered.copyParams(params);
+			return _yate.dispatch(answered);
+		};
+		/** @method Channel.hangup */
+		channel.hangup = (reason) => {
+			return _yate.dispatch(new YateMessage("call.drop", {reason: reason, id: channel.id}));
+		};
+		/** @method Channel.callTo */
+		channel.callTo = (dst, params = {}) => {
+			if (typeof dst !== "string") return;
+			let attach = new YateMessage("chan.attach", { notify: channel.id });
+			if (dst.startsWith("wave/record")) {
+				// wave/record
+				attach.source = "";
+				attach.consumer = dst;
+				attach.maxlen = 180000; //default 10 sec
+			} else {
+				// wave/play, tone/
+				attach.source = dst;
+				attach.consumer = "wave/record/-";
+			}
+			if (typeof params === "object") attach.copyParams(params);
+			//channel.queue.push(attach);
+			//if (channel.queue.length === 1) channel._notify({targetid: channel.id});
+			return new Promise(resolve => {
+				_yate.once("chan.notify", (msg) => {
+					if (msg.targetid === channel.id) resolve(msg);
+				});
+				_yate.enqueue(attach);
+			})
+		};
+		/** @method Channel.callJust */
+		channel.callJust = (dst, params = {}) => {
+			if (typeof dst !== "string") return;
+			let execute = new YateMessage("chan.masquerade", {
+				message: "call.execute",
+				id: channel.peerid,
+				callto: dst
+			});
+			if (typeof params === "object") execute.copyParams(params);
+			//channel.queue.push(execute);
+			//if (channel.queue.length === 1) channel._notify({id: channel.id});
+			_yate.enqueue(execute);
+			setTimeout(() => {process.exit(0)}, 3);
+		};
+		channel._notify = () => {
+			//if (channel.queue.length > 0 &amp;&amp; message.targetid === channel.id) {
+			//	_yate.dispatch(() => { channel.queue.splice(0, 1) }, channel.queue[0]);
+			//}
+		};
+		/** 
+		 * @method Channel.init
+		 * @async
+		 * @param {function} callback - runs just after initialization
+		 * @param {Object} params - params will be attached to first incoming call.execute message
+		 * @returns {YateMessage} - first incoming call.execute message
+		 * @description Channel must be activated before use with init([callback],[params]) method
+		 */
+		channel.init = (callback, params) => {
+			if (channel.peerid) return;
+			_yate.setlocal("id", channel.id);
+			_yate.install(channel._notify, "chan.notify", 100, "targetid", channel.id);
+			return new Promise( resolve => {
+				_yate.once("call.execute", (message) => {
+					channel.peerid = message.id;
+					channel.status = message.status;
+					message._handled = true;
+					message.targetid = channel.id;
+					if (typeof callback === "object") message.copyParams(callback);
+					if (typeof params === "object") message.copyParams(params);
+					_yate.acknowledge(message);
+					if (typeof callback === "function") callback(message);
+					resolve(message);
+				})
+			})
+		};
+
+		this._channel = channel;
+
+		let rl = createInterface(this.in);
+		rl.on("line", line => {
+			this._read(line);
+		});
+
+		this.emit("_connect");
+
+		return channel;
 	}
 
 	/**
@@ -685,6 +853,7 @@ class Yate extends EventEmitter {
 	 * @see https://docs.yate.ro/wiki/Standard_Messages
 	 */
 	install(callback, name, priority, filter, fvalue) {
+		let _yate = this;
 		if (typeof callback === "function" &amp;&amp; typeof name === "string") {
 			if (typeof priority !== "number") {
 				fvalue = typeof filter === "string" ? filter : undefined;
@@ -713,13 +882,26 @@ class Yate extends EventEmitter {
 					fvalue: fvalue
 				};
 				this.on(name, message => {
+					// setup acknowledge by timeout
+					let timeout = setTimeout(() => {
+						_yate.emit("_debug", "&lt;" +_yate._trackname + ":WARN> " + message._id + " Message '" + message._name + "' acknowledge timeout!");
+						this._acknowledge(message);
+					}, this._acknowledge_timeout);
+
 					// 4. promisify the (callback + acknowledge) )
 					let calltype = Object.getPrototypeOf(callback).constructor.name;
 					let promise; // it can be promise
 					if (calltype === "AsyncFunction" || calltype === "Promise")	promise = callback;
 					else promise = (msg) =>	new Promise( (resolve) => { resolve(callback(msg)) });
+
 					// 5. attach acknowledge
-					return promise(message).then( (ans) => {
+					return promise(message).then((ans) => {
+							clearTimeout(timeout);
+							if (message._acknowledged) {
+								// WARN message already acknowledged
+								_yate.emit("_debug", "&lt;" + _yate._trackname + ":WARN> " + message._id + " Message '" + message._name + "' already acknowledged!");
+								return;
+							}
 							if (typeof ans === "boolean") {
 								// if answer is boolean -> message.processed -> ack
 								message._handled = ans;
@@ -771,7 +953,7 @@ class Yate extends EventEmitter {
 	 * @param {function} callback - function to be message handler (required)
 	 * @param {string} name - message name (required)
 	 * @example
-	 * const {Yate, Message} = require("next-yate");
+	 * const {Yate, YateMessage} = require("next-yate");
 	 *
 	 * function onTimer(message) {
 	 *     concole.log(message.time);
@@ -1041,7 +1223,8 @@ class Yate extends EventEmitter {
 
 	// %%&lt;message:&lt;id>:&lt;processed>:[&lt;name>]:&lt;retvalue>[:&lt;key>=&lt;value>...]
 	_acknowledge(msg) {
-		if (msg._type !== "incoming") return;
+		if (msg._type !== "incoming" || msg._acknowledged) return;
+		msg._acknowledged = true;
 		this._write("%%&lt;message:" + _escape(msg._id) + ":" + _bool2str(msg._handled) + "::" + _escape(msg._retvalue) + _par2str(msg));
 	}
 
@@ -1103,6 +1286,7 @@ function _parseMessage(str) {
 			params._name = arg[3];
 			params._retvalue = _unescape(arg[4]);
 			params._type = "incoming";
+			params._acknowledged = false;
 			break;
 		case "%%&lt;message": // %%&lt;message:&lt;id>:&lt;processed>:[&lt;name>]:&lt;retvalue>[:&lt;key>=&lt;value>...]
 			params._id = arg[1];
@@ -1320,13 +1504,13 @@ module.exports = {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="Engine.html">Engine</a></li><li><a href="Message.html">Message</a></li></ul><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul><h3>Global</h3><ul><li><a href="global.html#getEngine">getEngine</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="Channel.html">Channel</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Message.html">Message</a></li></ul><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul><h3>Global</h3><ul><li><a href="global.html#getEngine">getEngine</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Tue Feb 11 2020 18:59:07 GMT+0300 (Москва, стандартное время)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Sun Feb 16 2020 12:23:04 GMT+0300 (Москва, стандартное время)
 </footer>
 
 <script> prettyPrint(); </script>

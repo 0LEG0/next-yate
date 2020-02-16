@@ -1,6 +1,6 @@
 {
   "name": "next-yate",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine)",
   "main": "libyate.js",
   "scripts": {

@@ -11,17 +11,20 @@ It contains two APIs to Yate:
 2. The second **compatible API** is my attempt to ensure API compatibility with the  Yate's JavaScript module (https://docs.yate.ro/wiki/Javascript_module). This API allows you to run scripts written for javascript.yate module in Nodejs enviroment with minimal modifications. To use the compatible API, you need to request following objects from the **getEngine** function:
     - **Engine**
     - **Message**
+    - **Channel**
 
 ## Features
 
-- Compatibility with javascript.yate with minimal code modifications, of course. (Please find eliza.js in /examples)
+- Compatibility with javascript.yate with minimal code modifications, of course. (Please find eliza.js, welcome.js in /examples)
 - Independence of other Nodejs modules.
 - Auto-restore connections and message handlers on network collisions.
 - Cache of all requests in offline mode.
 - Auto-acknowledge of the incoming messages by acknowledge_timeout. (This can be critical under high load, as it prevents Yate from crashing).
 
 [API description /docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
+
 [javascript.yate API](https://docs.yate.ro/wiki/Javascript_Reference)
+
 [External module protocol](https://docs.yate.ro/wiki/External_module_command_flow)
 
 
@@ -29,7 +32,6 @@ It contains two APIs to Yate:
 
 | API                   | javascrip.yate | next-yate | (\*)       |
 | :-------------------- | :------------- | :-------- | :--------- |
-| Message.acknowledge   | -              | yes       |            |
 | Message.watch         | -              | yes       |            |
 | Message.unwatch       | -              | yes       |            |
 | Message.install       | yes            | yes       |            |
@@ -43,7 +45,7 @@ It contains two APIs to Yate:
 | Message.broadcast     | yes            | -         |            |
 | Message.getParam      | yes            | yes       |            |
 | Message.setParam      | yes            | yes       |            |
-| Message.copyParams    | yes            | yes       | _not full_ |
+| Message.copyParams    | yes            | yes       |            |
 | Message.retValue      | yes            | yes       |            |
 | Message.msgTime       | yes            | yes       |            |
 | Message.getColumn     | yes            | -         |            |
@@ -105,7 +107,7 @@ It contains two APIs to Yate:
 | File                  | yes            | -         |            |
 | ConfigFile            | yes            | -         |            |
 | ConfigSection         | yes            | -         |            |
-| Channel               | yes            | -         |            |
+| Channel               | yes            | yes       | _async_    |
 | String                | yes            | yes       | _different_|
 
 
@@ -136,7 +138,7 @@ role=global
 ;
 ; Local stdin/stdout connected scripts
 [scripts]
-myscript.sh=           ; Custom shell wrapper around Nodejs script
+myscript.sh=            ; Custom shell wrapper around Nodejs script
 node.sh=my_script.js    ; Run my_script.js with example wrapper: examples/node.sh
 ```
 
@@ -191,9 +193,36 @@ NODE=`which node`
 $NODE $SCRIPTS/$1
 ```
 
+### Direct script execution mode from callto context
+
+regexroute.conf:
+```
+^NNN=extmodule/nodata/node.sh example.js
+```
+
+example.js
+```javascript
+const {Engine, Message, Channel} = require("next-yate").getEngine({channel: true});
+Channel.init(main, {autoring: true});
+
+async function main(message) {
+    await Channel.callTo("wave/play/./share/sounds/welcome.au");
+    await Channel.answered();
+    Channel.callJust("conf/333", {"lonely": true});
+}
+```
+(Please find welcome.js in /examples)
+
+### Core API
+_in progress_
+
+### Compatible API
+_in progress_
+
 ### Examples
 [/examples](https://github.com/0LEG0/next-yate/tree/master/examples)
 
 ### API
 [/docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
+
 [javascript.yate API](https://docs.yate.ro/wiki/Javascript_Reference)
