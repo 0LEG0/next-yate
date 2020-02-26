@@ -10,6 +10,8 @@
 - Cache of all requests in offline mode.
 - Auto-acknowledge of the incoming messages by acknowledge_timeout. (This can be critical under high load, as it prevents Yate from crashing).
 
+(* Compatibility with javascript.yate has been moved to [Next-Yate-Compat](https://github.com/0LEG0/next-yate-compat))
+
 [View Documentation](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
 
 [External module protocol](https://docs.yate.ro/wiki/External_module_command_flow)
