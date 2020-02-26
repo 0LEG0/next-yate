@@ -30,6 +30,8 @@
     
         <h2><span class="attribs"><span class="type-signature"></span></span>Yate<span class="signature">(options)</span><span class="type-signature"></span></h2>
         
+            <div class="class-description">Yate object provides connection to Yate's external module.</div>
+        
     
 </header>
 
@@ -39,6 +41,8 @@
         
 
     
+    <h2>Constructor</h2>
+    
 
     
     <h4 class="name" id="Yate"><span class="type-signature"></span>new Yate<span class="signature">(options)</span><span class="type-signature"></span></h4>
@@ -47,11 +51,6 @@
     
 
 
-
-<div class="description">
-    Core API Yate class.
-It provides connection to Yate's external module.
-</div>
 
 
 
@@ -144,7 +143,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Address of listerning Yate's extmodule (for example "127.0.0.1")</td>
+            <td class="description last">address of listerning Yate's extmodule for ex. "127.0.0.1", default "undefined", stdin/stdout connected</td>
         </tr>
 
     
@@ -167,7 +166,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">(default 5040)</td>
+            <td class="description last">port default 5040</td>
         </tr>
 
     
@@ -190,7 +189,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Socket path (default undefined)</td>
+            <td class="description last">socket path, default "undefined"</td>
         </tr>
 
     
@@ -213,7 +212,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Sets the track name of your script. (required, default value "next-yate")</td>
+            <td class="description last">track name of connected script, default "next-yate"</td>
         </tr>
 
     
@@ -236,7 +235,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Try to reconnect in collisions. (default true)</td>
+            <td class="description last">reconnect on collisions, default true</td>
         </tr>
 
     
@@ -259,7 +258,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Reconnect tries interval in milliseconds. (default 10000)</td>
+            <td class="description last">reconnect tries interval in milliseconds, default 10000</td>
         </tr>
 
     
@@ -282,7 +281,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Drops the response from Yate after dispatch_timeout in milliseconds, so that your code does not hang waiting endlessly for an answer. (default 3000)</td>
+            <td class="description last">auto drop the response waiting in Yate.dispatch method after the timeout in milliseconds if Engine not respond, default 10000</td>
         </tr>
 
     
@@ -305,7 +304,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Reply to the message without processing after a specified time, so as not to overload the Yate queue and not cause the engine to crash. (default 3000)</td>
+            <td class="description last">auto reply to incoming message as is if the callback function did not responded in the timeout, so as not to overload the Engine queue and not cause the engine to crash. default 10000</td>
         </tr>
 
     
@@ -328,7 +327,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Sets the maximum size of transferred query data in extmodule. (default 8190).</td>
+            <td class="description last">sets the maximum size of transferred data in extmodule, oversize will be truncated to the specified value, default 8192.</td>
         </tr>
 
     
@@ -351,7 +350,7 @@ It provides connection to Yate's external module.
 
             
 
-            <td class="description last">Direct run the script in channel mode ^NNN=extmodule/nodata/node.sh example.js</td>
+            <td class="description last">to run the Application in channel mode ^NNN=extmodule/nodata/node.sh example.js</td>
         </tr>
 
     
@@ -399,7 +398,7 @@ It provides connection to Yate's external module.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line436">line 436</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line159">line 159</a>
     </li></ul></dd>
     
 
@@ -409,6 +408,8 @@ It provides connection to Yate's external module.
     <dt class="tag-see">See:</dt>
     <dd class="tag-see">
         <ul>
+            <li><a href="Yate.html#init">Yate#init</a></li>
+        
             <li><a href="Yate.html#toChannel">Yate#toChannel</a></li>
         
             <li><a href="https://docs.yate.ro/wiki/External_module_command_flow">https://docs.yate.ro/wiki/External_module_command_flow</a></li>
@@ -439,9 +440,10 @@ It provides connection to Yate's external module.
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>const {Yate, YateMessage} = require("next-yate");
+    <pre class="prettyprint"><code>const {Yate} = require("next-yate");
 let yate = new Yate({host: "127.0.0.1", trackname: "myscript"});
-yate.init();</code></pre>
+yate.init();
+yate.output("Hello World!");</code></pre>
 
 
 
@@ -573,7 +575,7 @@ Not needed in common cases because of all incoming messages acknowledges automat
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line801">line 801</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line519">line 519</a>
     </li></ul></dd>
     
 
@@ -733,7 +735,7 @@ Not needed in common cases because of all incoming messages acknowledges automat
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line1089">line 1089</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line807">line 807</a>
     </li></ul></dd>
     
 
@@ -890,7 +892,7 @@ console.log(res.retValue());</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line1069">line 1069</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line787">line 787</a>
     </li></ul></dd>
     
 
@@ -950,7 +952,7 @@ yate.equeue(m);</code></pre>
 
 
 <div class="description">
-    Returns Console outputs to Yate's log
+    Returns Console connected to Yate's output
 </div>
 
 
@@ -994,7 +996,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line744">line 744</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line465">line 465</a>
     </li></ul></dd>
     
 
@@ -1043,7 +1045,7 @@ yate.equeue(m);</code></pre>
 
     <h5>Example</h5>
     
-    <pre class="prettyprint"><code>yate.getConsole().log("Find this message in yate's log");</code></pre>
+    <pre class="prettyprint"><code>yate.getConsole().log("Find this message in yate's output");</code></pre>
 
 
 
@@ -1053,7 +1055,7 @@ yate.equeue(m);</code></pre>
     
 
     
-    <h4 class="name" id="getEnvironment"><span class="type-signature">(async) </span>getEnvironment<span class="signature">(callback)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="getEnvironment"><span class="type-signature">(async) </span>getEnvironment<span class="signature">(callback)</span><span class="type-signature"> &rarr; {Object}</span></h4>
     
 
     
@@ -1154,7 +1156,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line772">line 772</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line490">line 490</a>
     </li></ul></dd>
     
 
@@ -1179,14 +1181,11 @@ yate.equeue(m);</code></pre>
 
 
 
+<h5>Returns:</h5>
 
-
-
-
-    <h5>Example</h5>
-    
-    <pre class="prettyprint"><code>yate.getEnvironment(console.log);
-{
+        
+<div class="param-desc">
+    {
   version: '6.1.1',
   release: 'devel1',
   nodename: 'svn',
@@ -1201,7 +1200,26 @@ yate.equeue(m);</code></pre>
   clientmode: 'false',
   supervised: 'false',
   maxworkers: '10'
-}</code></pre>
+}
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Object</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
 
 
 
@@ -1219,7 +1237,8 @@ yate.equeue(m);</code></pre>
 
 
 <div class="description">
-    Connecting to extmodule
+    Initialize the Yate instance.
+Connects it to Extmodule. Makes readable and writable inbound and outbound streams.
 </div>
 
 
@@ -1312,12 +1331,19 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line523">line 523</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line252">line 252</a>
     </li></ul></dd>
     
 
     
 
+    
+    <dt class="tag-see">See:</dt>
+    <dd class="tag-see">
+        <ul>
+            <li><a href="Yate.html#toChannel">Yate#toChannel</a></li>
+        </ul>
+    </dd>
     
 
     
@@ -1344,7 +1370,7 @@ yate.equeue(m);</code></pre>
     <h5>Example</h5>
     
     <pre class="prettyprint"><code>let yate = new Yate();
-yate.init(function() { console.log("Connnected") });</code></pre>
+yate.init(() => { console.log("Connnected") });</code></pre>
 
 
 
@@ -1548,7 +1574,7 @@ The yate engine will wait for a response to its message.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line827">line 827</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line545">line 545</a>
     </li></ul></dd>
     
 
@@ -1707,7 +1733,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line1125">line 1125</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line843">line 843</a>
     </li></ul></dd>
     
 
@@ -1890,7 +1916,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line1000">line 1000</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line718">line 718</a>
     </li></ul></dd>
     
 
@@ -1953,7 +1979,8 @@ console.log(ver);</code></pre>
 
 
 <div class="description">
-    Alternative initialization of script running from route context
+    Alternative initialization of Yate in channel mode with the special Channel object. 
+New instance of Yate --> Yate.toChannel --> Channel.init --> callback
 </div>
 
 
@@ -1997,12 +2024,19 @@ console.log(ver);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line612">line 612</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line343">line 343</a>
     </li></ul></dd>
     
 
     
 
+    
+    <dt class="tag-see">See:</dt>
+    <dd class="tag-see">
+        <ul>
+            <li><a href="Yate.html#init">Yate#init</a></li>
+        </ul>
+    </dd>
     
 
     
@@ -2080,7 +2114,7 @@ function main(message) {
 
 
 <div class="description">
-    Removes the install handler from a specific yate message
+    Removes the handler from a specific Engine message
 </div>
 
 
@@ -2173,7 +2207,7 @@ function main(message) {
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line906">line 906</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line624">line 624</a>
     </li></ul></dd>
     
 
@@ -2322,7 +2356,7 @@ function main(message) {
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line967">line 967</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line685">line 685</a>
     </li></ul></dd>
     
 
@@ -2495,7 +2529,7 @@ In contrast to the method of Yate.install it does not require an answer to messa
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="libyate.js.html">libyate.js</a>, <a href="libyate.js.html#line940">line 940</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line658">line 658</a>
     </li></ul></dd>
     
 
@@ -2563,13 +2597,13 @@ yate.watch(onTimer, "engine.timer");</code></pre>
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="Channel.html">Channel</a></li><li><a href="Engine.html">Engine</a></li><li><a href="Message.html">Message</a></li></ul><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul><h3>Global</h3><ul><li><a href="global.html#getEngine">getEngine</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="Channel.html">Channel</a></li></ul><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Sun Feb 16 2020 12:23:04 GMT+0300 (Москва, стандартное время)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Wed Feb 26 2020 20:27:21 GMT+0300 (Москва, стандартное время)
 </footer>
 
 <script> prettyPrint(); </script>

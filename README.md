@@ -1,115 +1,18 @@
-# Next-Yate _(experimental)_
+# Next-Yate
 
 ## Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine).
 
-It contains two APIs to Yate:
-
-1. The first **core API** is, in fact, the rewritten Nodejs version of the official PHP library libyate.php which is represented by following classes:
-    - **Yate**
-    - **YateMessage**
-
-2. The second **compatible API** is my attempt to ensure API compatibility with the  Yate's JavaScript module (https://docs.yate.ro/wiki/Javascript_module). This API allows you to run scripts written for javascript.yate module in Nodejs enviroment with minimal modifications. To use the compatible API, you need to request following objects from the **getEngine** function:
-    - **Engine**
-    - **Message**
-    - **Channel**
-
 ## Features
 
-- Compatibility with javascript.yate with minimal code modifications, of course. (Please find eliza.js, welcome.js in /examples)
+- Simple to use.
 - Independence of other Nodejs modules.
 - Auto-restore connections and message handlers on network collisions.
 - Cache of all requests in offline mode.
 - Auto-acknowledge of the incoming messages by acknowledge_timeout. (This can be critical under high load, as it prevents Yate from crashing).
 
-[API description /docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
-
-[javascript.yate API](https://docs.yate.ro/wiki/Javascript_Reference)
+[View Documentation](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
 
 [External module protocol](https://docs.yate.ro/wiki/External_module_command_flow)
-
-
-## Compatibility table
-
-| API                   | javascrip.yate | next-yate | (\*)       |
-| :-------------------- | :------------- | :-------- | :--------- |
-| Message.watch         | -              | yes       |            |
-| Message.unwatch       | -              | yes       |            |
-| Message.install       | yes            | yes       |            |
-| Message.uninstall     | yes            | yes       |            |
-| Message.enqueue       | yes            | yes       | _void_     |
-| Message.dispatch      | yes            | yes       | _async_    |
-| Message.handlers      | yes            | -         |            |
-| Message.installHook   | yes            | -         |            |
-| Message.uninstallHook | yes            | -         |            |
-| Message.trackName     | yes            | yes       | _async_    |
-| Message.broadcast     | yes            | -         |            |
-| Message.getParam      | yes            | yes       |            |
-| Message.setParam      | yes            | yes       |            |
-| Message.copyParams    | yes            | yes       |            |
-| Message.retValue      | yes            | yes       |            |
-| Message.msgTime       | yes            | yes       |            |
-| Message.getColumn     | yes            | -         |            |
-| Message.getRow        | yes            | -         |            |
-| Message.getResult     | yes            | -         |            |
-| Engine.output         | yes            | yes       |            |
-| Engine.debug          | yes            | yes       |            |
-| Engine.alarm          | yes            | yes       |            |
-| Engine.sleep          | yes            | yes       | _async_    |
-| Engine.usleep         | yes            | yes       | _async_    |
-| Engine.yield          | yes            | -         |            |
-| Engine.idle           | yes            | -         |            |
-| Engine.restart        | yes            | -         |            |
-| Engine.dump_r         | yes            | yes       | _async_    |
-| Engine.print_r        | yes            | yes       |            |
-| Engine.dump_t         | yes            | yes       | _async_    |
-| Engine.print_t        | yes            | yes       |            |
-| Engine.debugName      | yes            | yes       |            |
-| Engine.debugLevel     | yes            | yes       |            |
-| Engine.debugEnabled   | yes            | yes       |            |
-| Engine.debugAt        | yes            | yes       |            |
-| Engine.setDebug       | yes            | yes       |            |
-| Engine.started        | yes            | yes       |            |
-| Engine.runParams      | yes            | -         |            |
-| Engine.configFile     | yes            | -         |            |
-| Engine.setInterval    | yes            | yes       |            |
-| Engine.setTimeout     | yes            | yes       |            |
-| Engine.clearInterval  | yes            | yes       |            |
-| Engine.clearTimeout   | yes            | yes       |            |
-| Engine.loadLibrary    | yes            | -         |            |
-| Engine.loadObject     | yes            | -         |            |
-| Engine.replaceParams  | yes            | yes       |            |
-| Engine.atob           | yes            | yes       |            |
-| Engine.btoa           | yes            | yes       |            |
-| Engine.atoh           | yes            | -         |            |
-| Engine.htoa           | yes            | -         |            |
-| Engine.btoh           | yes            | -         |            |
-| Engine.htob           | yes            | -         |            |
-| Engine.shared         | yes            | -         |            |
-| Engine.name           | yes            | yes       |            |
-| Math.abs              | yes            | yes       |            |
-| Math.max              | yes            | yes       |            |
-| Math.min              | yes            | yes       |            |
-| Math.random           | yes            | yes       | _different_|
-| parseInt              | yes            | yes       |            |
-| isNan                 | yes            | -         |            |
-| RegExp.test           | yes            | yes       |            |
-| RegExp.valid          | yes            | -         |            |
-| Date                  | yes            | yes       |            |
-| XML                   | yes            | -         |            |
-| Hasher                | yes            | -         |            |
-| JSON.parse            | yes            | yes       |            |
-| JSON.stringify        | yes            | yes       |            |
-| JSON.loadFile         | yes            | -         |            |
-| JSON.saveFile         | yes            | -         |            |
-| JSON.replaceParams    | yes            | -         |            |
-| DNS                   | yes            | -         |            |
-| Shared                | yes            | -         |            |
-| File                  | yes            | -         |            |
-| ConfigFile            | yes            | -         |            |
-| ConfigSection         | yes            | -         |            |
-| Channel               | yes            | yes       | _async_    |
-| String                | yes            | yes       | _different_|
-
 
 ## Quick start
 
@@ -159,14 +62,6 @@ let yate = new Yate({ host: "127.0.0.1" });
 yate.init(() => console.log("Connected")); // Initialize connection before use
 yate.output("Hello World!");
 ```
-example_compatible_api.js:
-
-```javascript
-// Compatible API
-const { Engine, Message } = require("next-yate").getEngine({ host: "127.0.0.1" });
-
-Engine.output("Hello World!");
-```
 
 ### Local connected script
 
@@ -202,7 +97,9 @@ regexroute.conf:
 
 example.js
 ```javascript
-const {Engine, Message, Channel} = require("next-yate").getEngine({channel: true});
+const { Yate } = require("next-yate");
+const yate = new Yate();
+const Channel = yate.toChannel();
 Channel.init(main, {autoring: true});
 
 async function main(message) {
@@ -211,18 +108,10 @@ async function main(message) {
     Channel.callJust("conf/333", {"lonely": true});
 }
 ```
-(Please find welcome.js in /examples)
-
-### Core API
-_in progress_
-
-### Compatible API
-_in progress_
 
 ### Examples
 [/examples](https://github.com/0LEG0/next-yate/tree/master/examples)
 
 ### API
-[/docs](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
+[View Documentation](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
 
-[javascript.yate API](https://docs.yate.ro/wiki/Javascript_Reference)

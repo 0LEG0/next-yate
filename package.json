@@ -1,27 +1,26 @@
 {
   "name": "next-yate",
-  "version": "0.0.4",
-  "description": "Next-Yate is Nodejs interface library to the Yate external module (Yet Another Telephony Engine)",
-  "main": "libyate.js",
+  "version": "0.0.5",
+  "description": "Next-Yate is Nodejs External module for YATE (Yet Another Telephony Engine)",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/0LEG0/next-yate.git"
+    "url": "git+https://github.com/0LEG0/next-yate-core.git"
   },
   "keywords": [
     "yate",
-    "libyate",
     "extmodule",
     "node"
   ],
   "author": "Anton",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/0LEG0/next-yate/issues"
+    "url": "https://github.com/0LEG0/next-yate-core/issues"
   },
-  "homepage": "https://github.com/0LEG0/next-yate",
+  "homepage": "https://github.com/0LEG0/next-yate-core",
   "devDependencies": {
     "eslint": "^6.8.0"
   }
