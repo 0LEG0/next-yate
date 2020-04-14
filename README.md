@@ -5,7 +5,7 @@
 ## Features
 
 - Simple to use.
-- Channels are supported. _(Now creation of IVR or dialplan is as easy as a piece of cake)_.
+- Channel half-stuff abstraction. _(Now creation of IVR or dialplan is as easy as a piece of cake)_.
 - Auto-restore connections and message handlers on network collisions.
 - Cache of all requests in offline mode.
 - Auto-acknowledge of the incoming messages by acknowledge_timeout. _(This can be critical under high load, as it prevents Yate from crashing)_.
@@ -20,7 +20,7 @@
 ## Overiew
 - Yate class provides connection to Yate's external module.
 - YateMessage class is object Yate's external module can interact with.
-- YateChannel class is an abstraction over incoming call leg messages flow. It's like half-stuff.
+- YateChannel class is an abstraction over incoming call leg messages flow.
 
 ## Quick start
 
