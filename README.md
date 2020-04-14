@@ -5,10 +5,11 @@
 ## Features
 
 - Simple to use.
-- Independence of other Nodejs modules.
+- Channels are supported. _(Now creation of IVR or dialplan is as easy as a piece of cake)_.
 - Auto-restore connections and message handlers on network collisions.
 - Cache of all requests in offline mode.
-- Auto-acknowledge of the incoming messages by acknowledge_timeout. (This can be critical under high load, as it prevents Yate from crashing).
+- Auto-acknowledge of the incoming messages by acknowledge_timeout. _(This can be critical under high load, as it prevents Yate from crashing)_.
+- Independence of other Nodejs modules.
 
 (* Compatibility with javascript.yate has been moved to [Next-Yate-Compat](https://github.com/0LEG0/next-yate-compat))
 
@@ -90,7 +91,7 @@ NODE=`which node`
 $NODE $SCRIPTS/$1
 ```
 
-### Direct script execution mode from callto context
+### Direct script execution (Channel mode)
 
 regexroute.conf:
 ```
@@ -110,6 +111,8 @@ async function main(message) {
     Channel.callJust("conf/333", {"lonely": true});
 }
 ```
+### Simple IVR
+
 
 ### Examples
 [/examples](https://github.com/0LEG0/next-yate/tree/master/examples)

@@ -398,7 +398,7 @@
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line159">line 159</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line476">line 476</a>
     </li></ul></dd>
     
 
@@ -473,7 +473,7 @@ yate.output("Hello World!");</code></pre>
     
 
     
-    <h4 class="name" id="acknowledge"><span class="type-signature"></span>acknowledge<span class="signature">(message)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="acknowledge"><span class="type-signature">(async) </span>acknowledge<span class="signature">(message)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -481,7 +481,7 @@ yate.output("Hello World!");</code></pre>
 
 
 <div class="description">
-    Acknowledges the message
+    Acknowledges the message.
 Not needed in common cases because of all incoming messages acknowledges automatically
 </div>
 
@@ -575,7 +575,7 @@ Not needed in common cases because of all incoming messages acknowledges automat
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line519">line 519</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line984">line 984</a>
     </li></ul></dd>
     
 
@@ -600,6 +600,28 @@ Not needed in common cases because of all incoming messages acknowledges automat
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(YateMessage) or reject(Error)
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -611,7 +633,7 @@ Not needed in common cases because of all incoming messages acknowledges automat
     
 
     
-    <h4 class="name" id="dispatch"><span class="type-signature">(async) </span>dispatch<span class="signature">(callback, message)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="dispatch"><span class="type-signature">(async) </span>dispatch<span class="signature">(message)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -619,7 +641,7 @@ Not needed in common cases because of all incoming messages acknowledges automat
 
 
 <div class="description">
-    Dispatches the Message in the Yate engine
+    Dispatches the Message in the Yate engine.
 </div>
 
 
@@ -651,29 +673,6 @@ Not needed in common cases because of all incoming messages acknowledges automat
     </thead>
 
     <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>callback</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">function</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">Callback function (optional, if undefined returns promisyfied value)</td>
-        </tr>
-
     
 
         <tr>
@@ -735,7 +734,7 @@ Not needed in common cases because of all incoming messages acknowledges automat
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line807">line 807</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1362">line 1362</a>
     </li></ul></dd>
     
 
@@ -767,6 +766,28 @@ Not needed in common cases because of all incoming messages acknowledges automat
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - reolve(YateMessage) where YateMessage is handled message, reject(Error) on error
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -776,12 +797,10 @@ Not needed in common cases because of all incoming messages acknowledges automat
     <pre class="prettyprint"><code>const {Yate, YateMessage} = require("next-yate");
 let yate = new Yate();
 yate.init();
-// callback variant
 let m = new YateMessage("call.route", false, { id: "test/1", caller: "123", called: "321" });
-yate.dispatch(res => console.log(res.retValue()), m); // Output to console call.route request result
-// or async/await variant
-let res = await yate.dispatch(m);
-console.log(res.retValue());</code></pre>
+yate.dispatch(m)
+    .then(res => {console.log("Successfully dispatched\n", res.retValue())},
+          err => {console.log("Dispatch error\n", err)} );</code></pre>
 
 
 
@@ -791,7 +810,7 @@ console.log(res.retValue());</code></pre>
     
 
     
-    <h4 class="name" id="enqueue"><span class="type-signature"></span>enqueue<span class="signature">(message)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="enqueue"><span class="type-signature">(async) </span>enqueue<span class="signature">(message)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -892,7 +911,7 @@ console.log(res.retValue());</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line787">line 787</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1337">line 1337</a>
     </li></ul></dd>
     
 
@@ -924,6 +943,28 @@ console.log(res.retValue());</code></pre>
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(YateMessage) with unhandled message or reject(Error) on error
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -996,7 +1037,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line465">line 465</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line929">line 929</a>
     </li></ul></dd>
     
 
@@ -1055,7 +1096,7 @@ yate.equeue(m);</code></pre>
     
 
     
-    <h4 class="name" id="getEnvironment"><span class="type-signature">(async) </span>getEnvironment<span class="signature">(callback)</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    <h4 class="name" id="getEnvironment"><span class="type-signature">(async) </span>getEnvironment<span class="signature">()</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -1072,55 +1113,6 @@ yate.equeue(m);</code></pre>
 
 
 
-
-
-    <h5>Parameters:</h5>
-    
-
-<table class="params">
-    <thead>
-    <tr>
-        
-        <th>Name</th>
-        
-
-        <th>Type</th>
-
-        
-
-        
-
-        <th class="last">Description</th>
-    </tr>
-    </thead>
-
-    <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>callback</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">function</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last"></td>
-        </tr>
-
-    
-    </tbody>
-</table>
 
 
 
@@ -1156,7 +1148,7 @@ yate.equeue(m);</code></pre>
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line490">line 490</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line954">line 954</a>
     </li></ul></dd>
     
 
@@ -1185,7 +1177,31 @@ yate.equeue(m);</code></pre>
 
         
 <div class="param-desc">
-    {
+    - resolve(Object) where Object is set of connection's specific parameners
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
+
+
+
+
+    <h5>Example</h5>
+    
+    <pre class="prettyprint"><code>{
   version: '6.1.1',
   release: 'devel1',
   nodename: 'svn',
@@ -1200,7 +1216,150 @@ yate.equeue(m);</code></pre>
   clientmode: 'false',
   supervised: 'false',
   maxworkers: '10'
-}
+};</code></pre>
+
+
+
+        
+            
+
+    
+
+    
+    <h4 class="name" id="handlers"><span class="type-signature"></span>handlers<span class="signature">(filter)</span><span class="type-signature"> &rarr; {Array}</span></h4>
+    
+
+    
+
+
+
+<div class="description">
+    handlers() returns array of message handlers [{name, priority, handler, filterName, filterValue}]
+</div>
+
+
+
+
+
+
+
+
+
+    <h5>Parameters:</h5>
+    
+
+<table class="params">
+    <thead>
+    <tr>
+        
+        <th>Name</th>
+        
+
+        <th>Type</th>
+
+        
+
+        
+
+        <th class="last">Description</th>
+    </tr>
+    </thead>
+
+    <tbody>
+    
+
+        <tr>
+            
+                <td class="name"><code>filter</code></td>
+            
+
+            <td class="type">
+            
+                
+<span class="param-type">string</span>
+|
+
+<span class="param-type">RegExp</span>
+
+
+            
+            </td>
+
+            
+
+            
+
+            <td class="description last"></td>
+        </tr>
+
+    
+    </tbody>
+</table>
+
+
+
+
+
+
+<dl class="details">
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+
+    
+    <dt class="tag-source">Source:</dt>
+    <dd class="tag-source"><ul class="dummy"><li>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line570">line 570</a>
+    </li></ul></dd>
+    
+
+    
+
+    
+
+    
+</dl>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - Array of message handlers
 </div>
 
 
@@ -1211,7 +1370,7 @@ yate.equeue(m);</code></pre>
     </dt>
     <dd>
         
-<span class="param-type">Object</span>
+<span class="param-type">Array</span>
 
 
     </dd>
@@ -1229,7 +1388,7 @@ yate.equeue(m);</code></pre>
     
 
     
-    <h4 class="name" id="init"><span class="type-signature"></span>init<span class="signature">(callback)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="init"><span class="type-signature"></span>init<span class="signature">(callback)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -1237,8 +1396,8 @@ yate.equeue(m);</code></pre>
 
 
 <div class="description">
-    Initialize the Yate instance.
-Connects it to Extmodule. Makes readable and writable inbound and outbound streams.
+    Init the Yate instance.
+Connects it to Extmodule, makes readable and writable inbound and outbound streams.
 </div>
 
 
@@ -1290,7 +1449,7 @@ Connects it to Extmodule. Makes readable and writable inbound and outbound strea
 
             
 
-            <td class="description last"></td>
+            <td class="description last">callback will executed after successful connect</td>
         </tr>
 
     
@@ -1331,7 +1490,7 @@ Connects it to Extmodule. Makes readable and writable inbound and outbound strea
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line252">line 252</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line596">line 596</a>
     </li></ul></dd>
     
 
@@ -1363,6 +1522,28 @@ Connects it to Extmodule. Makes readable and writable inbound and outbound strea
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(true) if done or false if failed.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -1380,7 +1561,7 @@ yate.init(() => { console.log("Connnected") });</code></pre>
     
 
     
-    <h4 class="name" id="install"><span class="type-signature"></span>install<span class="signature">(callback, name, priority, filter, fvalue)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="install"><span class="type-signature">(async) </span>install<span class="signature">(handler, name, prio, filter, fvalue)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -1389,7 +1570,6 @@ yate.init(() => { console.log("Connnected") });</code></pre>
 
 <div class="description">
     Sets the handler to a specific message.
-The yate engine will wait for a response to its message.
 </div>
 
 
@@ -1425,7 +1605,7 @@ The yate engine will wait for a response to its message.
 
         <tr>
             
-                <td class="name"><code>callback</code></td>
+                <td class="name"><code>handler</code></td>
             
 
             <td class="type">
@@ -1441,7 +1621,7 @@ The yate engine will wait for a response to its message.
 
             
 
-            <td class="description last">function to be message handler (required)</td>
+            <td class="description last">message handler (required)</td>
         </tr>
 
     
@@ -1471,7 +1651,7 @@ The yate engine will wait for a response to its message.
 
         <tr>
             
-                <td class="name"><code>priority</code></td>
+                <td class="name"><code>prio</code></td>
             
 
             <td class="type">
@@ -1487,7 +1667,7 @@ The yate engine will wait for a response to its message.
 
             
 
-            <td class="description last">priority of the handler, as low value as high proirity (optional, default 100)</td>
+            <td class="description last">priority of the handler on Yate's side, as low value as high proirity (optional, default value 100)</td>
         </tr>
 
     
@@ -1510,7 +1690,7 @@ The yate engine will wait for a response to its message.
 
             
 
-            <td class="description last">set the filter to message parameter (optional, for example "called")</td>
+            <td class="description last">filter is name of message parameter (optional, for example "called")</td>
         </tr>
 
     
@@ -1533,7 +1713,7 @@ The yate engine will wait for a response to its message.
 
             
 
-            <td class="description last">filter value (optional, for example "^9999.*")</td>
+            <td class="description last">filter is value of message parameter (optional, for example "^9999.*")</td>
         </tr>
 
     
@@ -1574,7 +1754,7 @@ The yate engine will wait for a response to its message.
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line545">line 545</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1016">line 1016</a>
     </li></ul></dd>
     
 
@@ -1608,6 +1788,28 @@ The yate engine will wait for a response to its message.
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(true) on successfully installed handler, resolve(false) on fail, reject(Error) on error
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -1622,7 +1824,7 @@ function onRoute(message) {
 
 let yate = new Yate();
 yate.init();
-yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler to "call.route" messages where parameter message.called begins with "9999", handler has priority 90</code></pre>
+yate.install(onRoute, "call.route", 90, "called", "^9999.*");</code></pre>
 
 
 
@@ -1733,7 +1935,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line843">line 843</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1390">line 1390</a>
     </li></ul></dd>
     
 
@@ -1769,7 +1971,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
 
     
-    <h4 class="name" id="setlocal"><span class="type-signature">(async) </span>setlocal<span class="signature">(callback, name, value)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="setlocal"><span class="type-signature">(async) </span>setlocal<span class="signature">(name, value)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -1777,7 +1979,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
 
 
 <div class="description">
-    Set/change/read extmodule connection parameters.
+    Set/change/read connection parameters.
 </div>
 
 
@@ -1809,29 +2011,6 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     </thead>
 
     <tbody>
-    
-
-        <tr>
-            
-                <td class="name"><code>callback</code></td>
-            
-
-            <td class="type">
-            
-                
-<span class="param-type">function</span>
-
-
-            
-            </td>
-
-            
-
-            
-
-            <td class="description last">result handler (optional, if undefined returns promisyfied value)</td>
-        </tr>
-
     
 
         <tr>
@@ -1916,7 +2095,7 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line718">line 718</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1283">line 1283</a>
     </li></ul></dd>
     
 
@@ -1948,6 +2127,28 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(value or success)
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -1957,9 +2158,6 @@ yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler
     <pre class="prettyprint"><code>const {Yate, YateMessage} = require("next-yate");
 let yate = new Yate();
 yate.init();
-// callback variant
-yate.setlocal(console.log, "engine.version"); // output value to console
-// or async/await variant
 let ver = await yate.setlocal("engine.version");
 console.log(ver);</code></pre>
 
@@ -1971,7 +2169,7 @@ console.log(ver);</code></pre>
     
 
     
-    <h4 class="name" id="toChannel"><span class="type-signature">(async) </span>toChannel<span class="signature">()</span><span class="type-signature"> &rarr; {Object}</span></h4>
+    <h4 class="name" id="toChannel"><span class="type-signature"></span>toChannel<span class="signature">()</span><span class="type-signature"> &rarr; {<a href="YateChannel.html">YateChannel</a>}</span></h4>
     
 
     
@@ -2024,7 +2222,7 @@ New instance of Yate --> Yate.toChannel --> Channel.init --> callback
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line343">line 343</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line709">line 709</a>
     </li></ul></dd>
     
 
@@ -2035,6 +2233,8 @@ New instance of Yate --> Yate.toChannel --> Channel.init --> callback
     <dd class="tag-see">
         <ul>
             <li><a href="Yate.html#init">Yate#init</a></li>
+        
+            <li><a href="YateChannel.html">YateChannel</a></li>
         </ul>
     </dd>
     
@@ -2059,10 +2259,6 @@ New instance of Yate --> Yate.toChannel --> Channel.init --> callback
 <h5>Returns:</h5>
 
         
-<div class="param-desc">
-    Channel
-</div>
-
 
 
 <dl>
@@ -2071,7 +2267,7 @@ New instance of Yate --> Yate.toChannel --> Channel.init --> callback
     </dt>
     <dd>
         
-<span class="param-type">Object</span>
+<span class="param-type"><a href="YateChannel.html">YateChannel</a></span>
 
 
     </dd>
@@ -2106,7 +2302,7 @@ function main(message) {
     
 
     
-    <h4 class="name" id="uninstall"><span class="type-signature"></span>uninstall<span class="signature">(name)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="uninstall"><span class="type-signature">(async) </span>uninstall<span class="signature">(name)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -2114,7 +2310,7 @@ function main(message) {
 
 
 <div class="description">
-    Removes the handler from a specific Engine message
+    Removes the handler from a specific message
 </div>
 
 
@@ -2207,7 +2403,7 @@ function main(message) {
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line624">line 624</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1089">line 1089</a>
     </li></ul></dd>
     
 
@@ -2239,6 +2435,28 @@ function main(message) {
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(true) if message handler removed from Yate's side, resolve(false) if no, reject(Error) on error.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -2255,7 +2473,7 @@ function main(message) {
     
 
     
-    <h4 class="name" id="unwatch"><span class="type-signature"></span>unwatch<span class="signature">(name)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="unwatch"><span class="type-signature">(async) </span>unwatch<span class="signature">(name)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -2263,7 +2481,7 @@ function main(message) {
 
 
 <div class="description">
-    Removes the watch handler from a specific yate message
+    Removes the watch handler from a specific yate message.
 </div>
 
 
@@ -2356,7 +2574,7 @@ function main(message) {
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line685">line 685</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1216">line 1216</a>
     </li></ul></dd>
     
 
@@ -2388,6 +2606,28 @@ function main(message) {
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(true) if message handler removed from Yate's side, resolve(false) if no, reject(Error) on error.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -2404,7 +2644,7 @@ function main(message) {
     
 
     
-    <h4 class="name" id="watch"><span class="type-signature"></span>watch<span class="signature">(callback, name)</span><span class="type-signature"></span></h4>
+    <h4 class="name" id="watch"><span class="type-signature">(async) </span>watch<span class="signature">(handler, name)</span><span class="type-signature"> &rarr; {Promise}</span></h4>
     
 
     
@@ -2449,7 +2689,7 @@ In contrast to the method of Yate.install it does not require an answer to messa
 
         <tr>
             
-                <td class="name"><code>callback</code></td>
+                <td class="name"><code>handler</code></td>
             
 
             <td class="type">
@@ -2529,7 +2769,7 @@ In contrast to the method of Yate.install it does not require an answer to messa
     
     <dt class="tag-source">Source:</dt>
     <dd class="tag-source"><ul class="dummy"><li>
-        <a href="index.js.html">index.js</a>, <a href="index.js.html#line658">line 658</a>
+        <a href="index.js.html">index.js</a>, <a href="index.js.html#line1169">line 1169</a>
     </li></ul></dd>
     
 
@@ -2563,6 +2803,28 @@ In contrast to the method of Yate.install it does not require an answer to messa
 
 
 
+<h5>Returns:</h5>
+
+        
+<div class="param-desc">
+    - resolve(true) on successfully installed handler, resolve(false) on fail, reject(Error) on error.
+</div>
+
+
+
+<dl>
+    <dt>
+        Type
+    </dt>
+    <dd>
+        
+<span class="param-type">Promise</span>
+
+
+    </dd>
+</dl>
+
+    
 
 
 
@@ -2597,13 +2859,13 @@ yate.watch(onTimer, "engine.timer");</code></pre>
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="Channel.html">Channel</a></li></ul><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateChannel.html">YateChannel</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Wed Feb 26 2020 20:27:21 GMT+0300 (Москва, стандартное время)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Tue Apr 14 2020 17:20:08 GMT+0300 (Москва, стандартное время)
 </footer>
 
 <script> prettyPrint(); </script>

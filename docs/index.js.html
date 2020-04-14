@@ -29,7 +29,7 @@
             <pre class="prettyprint source linenums"><code>/**
  * @file "Next-Yate"
  * @author Anton &lt;aucyxob@gmail.com>
- * @version 0.0.5
+ * @version 0.1.0
  * @license Apache-2.0
  * @description Next-Yate is Nodejs External module for YATE (Yet Another Telephony Engine).
  * @see https://github.com/0LEG0/next-yate
@@ -42,6 +42,7 @@ const { Writable } = require("stream");
 const { Socket } = require("net");
 const { EventEmitter } = require("events");
 const { createInterface } = require("readline");
+const util = require("util");
 
 // defaults
 const _TRACKNAME = "next-yate";
@@ -49,9 +50,324 @@ const _BUFFER_SIZE = 8192; // default 8192
 const _DISPATCH_TIMEOUT = 10000; // default 10000
 const _ACKNOWLEDGE_TIMEOUT = 10000; // default 10000
 const _RECONNECT_TIMEOUT = 10000;
+const _CALL_TIMEOUT = 3600000; // 1 hour
 const _PORT = 5040;
 //const _HOST = "127.0.0.1";
 const _OFFLINE_QUEUE = 100; // default 10
+
+/**
+ * YateChannel is an abstraction over incoming call leg.
+ * It simplifyes most typical operations with call like attach media, answer/hangup, redirect and etc.
+ * @class
+ * @param {YateMessage} message - Only "call.route" or "call.execute" are supported (required)
+ * @example
+ * let chan = new YateChannel(incoming_message);
+ * chan.init()
+ *     .then(m => console.log("Channel", m.id, "initialized"))
+ *     .then(() => chan.callTo("wave/play/./prompt.au"))
+ *     .then(m => console.log("Channel", m.id, "prompted"))
+ *     .then(() => chan.callJust("sip/sip:123@10.0.0.2"))
+ *     .then(m => console.log("Channel", m.id, "redirected"));
+ */
+class YateChannel extends EventEmitter {
+	constructor(message) {
+		// TODO channel for outgoing call, now is only for incoming
+		if (message.name !== "call.route" &amp;&amp; message.name !== "call.execute" || message._type === "outgoing")
+			throw new Error("Not valid message to create YateChannel");
+		super();
+		this.id = message.id;
+		this.peerid = message.peerid;
+		this._yate = message._yate; // parent Yate
+		this.status = message.answered || message.autoanswer ? "answered" : message.status;
+
+		message.earlymedia = true;
+		
+		if (message.name === "call.execute" &amp;&amp; message._type === "notification") {
+			this.ready = true; // to skip init()
+		} else  {
+			this.ready = false;
+		}
+
+		this._yate.watch(() => {}, "chan.notify", "id", this.id); // prevents watch/unwatch till channel lifetime
+		
+		// unsubscribe on hangup
+		this._yate.watch(() => {
+			this.ready = false;
+			this.status = "hangup";
+			this.removeAllListeners();
+			this._yate._watches.forEach(item => {
+				if (item.filterName === "id" &amp;&amp; item.filterValue === this.id) this._yate.unwatch(item.handler, item.name, item.filterName, item.filterValue);
+			});
+			this._yate._installs.forEach(item => {
+				if (item.filterName === "id" &amp;&amp; item.filterValue === this.id) this._yate.uninstall(item.handler, item.name, item.priority, item.filterName, item.filterValue);
+			});
+		}, "chan.hangup", "id", this.id);
+	}
+
+	/**
+	 * init() - initialize YateChannel before use.
+	 * This method waits until the "call.execute" message arrives.
+	 * @method
+	 * @param {function} callback - (optional)
+	 * @returns {Promise} - resolve(YateMessage), resolve(false) if timeout
+	 * @async
+	 */
+	init(callback) {
+		// if "ready" don't wait for call.execute
+		if (this.ready) {
+			return new Promise(resolve => {
+				let message = {name: "call.execute", id: this.id, peerid: this.peerid, handled: true};
+				if (typeof callback === "function") callback(message);
+				resolve(message)
+			});
+		}
+
+		return new Promise(resolve => {
+			// reject by timeout
+			let timer = setTimeout(() => {
+				this._yate.unwatch("call.execute", "id", this.id);
+				resolve(false);
+			}, this._yate._dispatch_timeout);
+
+			// wait call.execute
+			this._yate.watch(message => {
+				clearTimeout(timer);
+				this._yate.unwatch("call.execute", "id", this.id);
+				// update peerid
+				this.peerid = message.peerid;
+				this.status = message.answered || message.autoanswer ? "answered" : message.status;
+				this.ready = true;
+				if (typeof callback === "function") callback(message);
+				resolve(message);
+			}, "call.execute", "id", this.id);
+		});
+	}
+
+	/**
+	 * reset() - rejects active promise of channel.
+	 * It's useful if you need to break the chain of promises
+	 * @method
+	 * @param {any} message (optional) 
+	 * @returns {undefined}
+	 */
+	reset(message) {
+		this.emit("reset", message);
+	}
+
+	/**
+	 * callTo() is an abstraction over chan.attach message.
+	 * @method
+	 * @param {string} dst - is source for "wave/play/", consumer for "wave/record/" or override for "tone/" (required)
+	 * @param {Object} params - parameters of chan.attach message (optional)
+	 * @returns {Promise} - resolve(false) if channel is not ready or has not been initialized, resolve(YateMessage) with last message on complete
+	 * @async
+	 * @see http://docs.yate.ro/wiki/Chan.attach
+	 */
+	callTo(dst, params = {}) {
+		if (!this.ready || typeof dst !== "string") return Promise.resolve(false);
+		
+		let notify = this._yate._trackname + "-notify/" + Date.now(); // &lt;-- special targetid for notify handler
+		let eof = true;
+		let timeout;
+		if (typeof params.timeout === "number") timeout = params.timeout;
+		let attach = new YateMessage("chan.masquerade", {
+            message: "chan.attach",
+            id: this.peerid,
+			notify: notify
+		});
+
+		if (dst.startsWith("wave/record")) {
+			// wave/record
+			attach.source = "wave/play/-";
+			attach.consumer = dst;
+			attach.maxlen = 180000; //default 10 sec
+		} else if (dst.startsWith("tone/dtmf")) {
+			// tone/dtmf
+			attach.id = this.id;
+			attach.override = dst;
+			if (!timeout &amp;&amp; dst.startsWith("tone/dtmfstr/")) {
+				timeout = dst.slice(14).length * 250;
+			} else {
+				timeout = 250;
+			}
+			eof = false;
+		} else {
+			// wave/play, tone/
+			attach.source = dst;
+			attach.consumer = "wave/record/-";
+		}
+
+		if (typeof params === "object") attach.copyParams(params);
+
+		return new Promise((resolve, reject) => {
+			// reset
+			this.once("reset", reject);
+			// tone
+			if (!eof) {
+				this._yate.dispatch(attach)
+					.then(message => { setTimeout(() => {message.reason = "eof"; resolve(message)}, timeout ? timeout : 250) });
+				return;
+			}
+
+			// watcher
+			let handler;
+            this._yate.watch(handler = (message) => {
+				clearTimeout(timer);
+				this._yate.unwatch(handler, "chan.notify", "targetid", notify);
+				resolve(message);
+				this.removeListener("reset", reject);
+			}, "chan.notify", "targetid", notify);
+			// timeout
+			let timer = setTimeout(() => {
+				this._yate.unwatch(handler, "chan.notify", "targetid", notify);
+				attach.reason = "eof";
+				resolve(attach);
+				this.removeListener("reset", reject);
+			}, timeout ? timeout : this._yate._call_timeout);
+
+			this._yate.enqueue(attach);
+		});
+	}
+
+	/**
+	 * callJust() is an abstraction over call.execute message.
+	 * @method
+	 * @param {string} dst - callto destination for call.execute message i.e. "sip/sip:xxx@1.2.3.4"
+	 * @param {Object} params - parameters for call.execute message (optional)
+	 * @returns {Promise} - resolve(false) if channel is not ready or has not been initialized, resolve(YateMessage) with handled "call.execute"
+	 * @async
+	 * @see http://docs.yate.ro/wiki/Call.execute
+	 */
+	callJust(dst, params) {
+		if (!this.ready  || typeof dst !== "string") return Promise.resolve(false);
+
+		let callto = new YateMessage("chan.masquerade", {
+            message: "call.execute",
+            id: this.id,
+            callto: dst
+		});
+		if (typeof params === "object") callto.copyParams(params);
+		
+		return this._yate.dispatch(callto)
+			.then(message => {
+				// update peerid
+				this.peerid = message.peerid;
+				this.status = message.status;
+				return message} );
+	}
+
+	/**
+	 * ringing() is an abstraction over call.ringing message.
+	 * @method
+	 * @param {Object} params - parameters of call.ringing message (optional)
+	 * @returns {Promise} - resolve(false) if channel is not ready or has not been initialized, resolve(YateMessage) with "call.ringing"
+	 * @async
+	 * @see http://docs.yate.ro/wiki/Call.ringing
+	 */
+	ringing(params) {
+		if (!this.ready) return Promise.resolve(false);
+
+		let ringing = new YateMessage("chan.masquerade", {
+			message: "call.ringing",
+			id: this.peerid,
+			targetid: this.id
+		});
+		if (typeof params === "object") ringing.copyParams(params);
+		// update status
+		this.status = this.status === "answered" ? "answered" : "ringing";
+
+		return this._yate.dispatch(ringing);
+	}
+
+	/**
+	 * progress() is an abstraction over call.progress message.
+	 * @method
+	 * @param {Object} params - parameters of call.progress message (optional)
+	 * @returns {Promise} - resolve(false) if channel is not ready or has not been initialized, resolve(YateMessage) with "call.progress"
+	 * @async
+	 * @see http://docs.yate.ro/wiki/Call.progress
+	 */
+	progress(params) {
+		if (!this.ready) return Promise.resolve(false);
+
+		let ringing = new YateMessage("chan.masquerade", {
+			message: "call.progress",
+			id: this.peerid,
+			targetid: this.id
+		});
+		if (typeof params === "object") ringing.copyParams(params);
+		// update status
+		this.status = this.status === "answered" ? "answered" : "ringing";
+
+		return this._yate.dispatch(ringing);
+	}
+
+	/**
+	 * answered() is an abstraction over call.answered message.
+	 * @method
+	 * @param {Object} params - parameters of call.answered message (optional)
+	 * @returns {Promise} - resolve(false) if channel is not ready or has not been initialized, resolve(YateMessage) with "call.answered"
+	 * @async
+	 * @see http://docs.yate.ro/wiki/Call.answered
+	 */
+	answered(params) {
+		if (!this.ready) return Promise.resolve(false);
+
+		let answered = new YateMessage("chan.masquerade", {
+			message: "call.answered",
+			id: this.peerid,
+			targetid: this.id
+		});
+		if (typeof params === "object") answered.copyParams(params);
+		// update status
+		this.status = "answered";
+
+		return this._yate.dispatch(answered);
+	}
+
+	/**
+	 * hangup() is an abstraction over call.drop message.
+	 * @method
+	 * @param {string} reason - reason parameter of call.drop message (optional)
+	 * @returns {Promise} - resolve(YateMessage) with "call.drop" message
+	 * @async
+	 * @see http://docs.yate.ro/wiki/Call.drop
+	 */
+	hangup(reason) {
+		this.status = "dropped";
+		return this._yate.dispatch(new YateMessage("call.drop", {reason: reason, id: this.id}));
+	}
+
+	/**
+	 * watch() - to set the "watch" handler for the channel: filterName = "id", filterValue = channel.id.
+	 * Calling this method multiple times will overwrite the previous event handler. All event subscriptions will be automatically deleted after the call/channel hangup.
+	 * @method
+	 * @param {function} handler - (required)
+	 * @param {string} name - (required)
+	 * @returns {Promise}
+	 * @async
+	 * @see Yate#watch
+	 */
+	watch(handler, name) {
+		if (typeof handler !== "function" || typeof name !== "string") return Promise.reject(new Error("Arguments error. Handler and message name required."));
+		return this._yate.watch(handler, name, "id", this.id);
+	}
+
+	/**
+	 * install() - to set the "install" handler for the channel.
+	 * @method
+	 * @param {function} handler - (required)
+	 * @param {string} name - (required)
+	 * @param {number} priority - default value is 80 (optional)
+	 * @returns {Promise}
+	 * @async
+	 * @see Yate#install
+	 */
+	install(handler, name, priority = 80) {
+		if (typeof handler !== "function" || typeof name !== "string") return Promise.reject(new Error("Arguments error. Handler and message name required."));
+		return this._yate.install(handler, name, priority, "id", this.id);
+	}
+}
 
 /**
  * YateMessage is object Yate can interact with.
@@ -73,7 +389,7 @@ const _OFFLINE_QUEUE = 100; // default 10
  */
 class YateMessage {
 	constructor(name, broadcast, params) {
-		if (typeof name !== "string" || name.length &lt; 1) throw new Error("Message name are required!");
+		if (typeof name !== "string" || name.length &lt; 1) throw new Error("Message name required.");
 		if (typeof broadcast === "boolean") this._broadcast = broadcast;
 		if (typeof broadcast === "object" &amp;&amp; broadcast) params = broadcast;
 		this._name = name;
@@ -81,6 +397,7 @@ class YateMessage {
 		this._id = `${this._time}.${process.hrtime()[1]}`;
 		this._type = "outgoing";
 		this._handled = false;
+		this._yate; // link to Yate
 		this.copyParams(params, "", false);
 	}
 
@@ -203,20 +520,19 @@ class Yate extends EventEmitter {
 		this._trackname = options.trackname ? options.trackname : _TRACKNAME;
 		this._channel = "channel" in options ? options.channel : false;
 		this.setMaxListeners(options.queue ? options.queue : _OFFLINE_QUEUE);
+		this._call_timeout = options.call_timeout ? options.call_timeout : _CALL_TIMEOUT;
+		this._first_run = true;
 
 		/*
-		 * Reconnection memory of
+		 * Restore on reconnect:
 		 * setlocals, installs, watches
 		 */
 		// {name, value}
-		this._setlocals = [{ name: "trackparam", value: this._trackname }];
-		if (this._bufsize !== _BUFFER_SIZE) this._setlocals.push({ name: "bufsize", value: this._bufsize });
-		if (this._reconnect) this._setlocals.push({ name: "restart", value: this._reconnect });
-		if (this._acknowledge_timeout !== _ACKNOWLEDGE_TIMEOUT) this._setlocals.push({ name: "timeout", value: this._acknowledge_timeout });
+		this._setlocals = [];
 
-		// {callback, name, priority, filter, fvalue}
+		// {name, priority, handler, filterName, filterValue}
 		this._installs = [];
-		// {callback, name}
+		// {name, handler, filterName, filterValue}
 		this._watches = [];
 
 		// Dumped stream
@@ -240,6 +556,12 @@ class Yate extends EventEmitter {
 				setTimeout(process.exit, 100);
 			});
 		}
+
+		// set options
+		this.setlocal("trackparam", this._trackname);
+		if (this._bufsize !== _BUFFER_SIZE) this.setlocal("bufsize", this._bufsize);
+		if (this._reconnect) this.setlocal("restart", this._reconnect);
+		if (this._acknowledge_timeout !== _ACKNOWLEDGE_TIMEOUT) this.setlocal("timeout", this._acknowledge_timeout);
 	}
 
 	get trackname() { return this._trackname }
@@ -268,90 +590,133 @@ class Yate extends EventEmitter {
 	set path(value) {} // readonly
 
 	/**
-	 * Initialize the Yate instance.
-	 * Connects it to Extmodule. Makes readable and writable inbound and outbound streams. 
+	 * handlers() returns array of message handlers [{name, priority, handler, filterName, filterValue}]
 	 * @method
-	 * @param {function} callback
+	 * @param {string|RegExp} filter
+	 * @returns {Array} - Array of message handlers
+	 */
+	handlers(filter) {
+		let ans = [];
+		if (typeof filter === "string") {
+			this._installs.forEach(item => { if (item.name === filter) { item.trackName = this._trackname; ans.push(item) } });
+			this._watches.forEach(item => { if (item.name === filter) { item.trackName = this._trackname; ans.push(item) } });
+		} else if (util.types.isRegExp(filter)) {
+			this._installs.forEach(item => { if (filter.test(item.name)) { item.trackName = this._trackname; ans.push(item) } });
+			this._watches.forEach(item => { if (filter.test(item.name)) { item.trackName = this._trackname; ans.push(item) } });
+		} else {
+			this._installs.forEach(item => { item.trackName = this._trackname; ans.push(item) });
+			this._watches.forEach(item => { item.trackName = this._trackname; ans.push(item) });
+		}
+		return ans;
+	}
+
+	/**
+	 * Init the Yate instance.
+	 * Connects it to Extmodule, makes readable and writable inbound and outbound streams. 
+	 * @method
+	 * @param {function} callback - callback will executed after successful connect
+	 * @returns {Promise} - resolve(true) if done or false if failed.
 	 * @example
 	 * let yate = new Yate();
 	 * yate.init(() => { console.log("Connnected") });
 	 * @see Yate#toChannel
 	 */
 	init(callback) {
+		if (this._connected) return Promise.resolve(false);
 		if (this._channel) return this.toChannel();
+	
+		// local
 		if (!this._host) {
-			// local start
-			this._restore(callback); // &lt;-- start here
-			return;
+			if (this._connected) return Promise.resolve(false);
+			this._connected = true;
+			let rl = createInterface(this.in);
+			rl.on("line", line => { this._read(line) });
+			if (typeof callback === "function") callback(); // &lt;-- callback
+			return Promise.resolve(true);
 		}
-		if (this._connected) return;
-		if (this.timer) clearTimeout(this.timer);
+		
+		// network
+		if (this._timer) clearTimeout(this._timer);
+		if (this._socket) this._socket.removeAllListeners();
+		this._socket = new Socket();
 
-		this._socket = new Socket(); // network start
-
-		this._socket.on("connect", () => {
-			this.in = this.out = this._socket;
-			this._restore(callback); // &lt;-- or start here
-		});
-
-		this._socket.on("end", () => {
+		this._socket.once("end", () => {
 			this._connected = false;
+			if (this._timer) clearTimeout(this._timer); // (*)
 			this.emit("_disconnect");
-			if (this._reconnect)
-				this.timer = setTimeout(() => {
-					this.init();
+			if (this._reconnect) {
+				this._timer = setTimeout(() => {
+					if (this._first_run) {
+						this.init(callback).then(() => this._first_run = false);
+					} else {
+						this.init().then(() => this._restore());
+					}
 				}, this._reconnnect_timeout);
+			}
+			if (this._debug) this.emit("_debug", "&lt;Socket> end");
 		});
 
-		this._socket.on("error", error => {
+		this._socket.once("error", error => {
 			this._connected = false;
+			if (this._timer) clearTimeout(this._timer); // (*)
+			if (this._debug) this.emit("_debug", "&lt;Socket> error");
 			if (this._reconnect) {
-				this.timer = setTimeout(() => {
-					this.init(callback);
+				this._timer = setTimeout(() => {
+					if (this._first_run) {
+						this.init(callback).then(() => this._first_run = false);
+					} else {
+						this.init().then(() => this._restore());
+					}
 				}, this._reconnnect_timeout);
 			} else {
 				this.emit("_error", error);
 			}
 		});
 
-		this._socket.connect({
-			path: this._path,
-			port: this._port,
-			host: this._host,
-			timeout: this.timeout
+		return new Promise(resolve => {
+			this._socket.on("ready", () => {
+				// workaround for socket case: "end" just after "connect"
+				this._timer = setTimeout(() => {
+					this.in = this.out = this._socket;
+					this._connected = true;
+					let rl = createInterface(this.in);
+					rl.on("line", line => { this._read(line) });
+					this.emit("_connect");
+					resolve(true);
+				}, 500); //
+				if (typeof callback === "function") callback(); // &lt;-- callback
+				this._first_run = false;
+				if (this._debug) this.emit("_debug", "&lt;Socket> ready");
+			});
+
+			this._socket.connect({
+				path: this._path,
+				port: this._port,
+				host: this._host,
+				timeout: this.timeout
+			});
 		});
 	}
 
-	// restore handlers
-	_restore(callback) {
-		if (this._connected) return;
-		this._connected = true;
-		let rl = createInterface(this.in);
-		rl.on("line", line => {
-			this._read(line);
-		});
-		// restore: setlocal, install &amp; watch
+	_restore() {
+		//if (!this._connected) return;
+		// re-setlocal, re-install &amp; re-watch
 		this._setlocals.forEach(item => {
 			this._setlocal(item.name, item.value);
 		});
 		this._installs.forEach(item => {
-			this.removeAllListeners(item.name);
-			this.install(item.callback, item.name, item.priority, item.filter, item.fvalue);
+			this._install(item.name, item.priority);
 		});
 		this._watches.forEach(item => {
-			this.removeAllListeners(item.name);
-			this.watch(item.callback, item.name, item.priority, item.filter, item.fvalue);
+			this._watch(item.name);
 		});
-		this.emit("_connect");
-		if (typeof callback === "function") callback(this);
 	}
 
 	/**
 	 * Alternative initialization of Yate in channel mode with the special Channel object. 
 	 * New instance of Yate --> Yate.toChannel --> Channel.init --> callback
 	 * @method
-	 * @async
-	 * @returns {Object} Channel
+	 * @returns {YateChannel}
 	 * @example
 	 * regexroute.conf:
 	 * ^NNN=extmodule/nodata/node.sh example.js
@@ -367,6 +732,7 @@ class Yate extends EventEmitter {
 	 *         Channel.callJust("wave/play/./share/sounds/welcome.au");
 	 * }
 	 * @see Yate#init
+	 * @see YateChannel
 	 */
 	toChannel() {
 		if (typeof this._channel === "object") return this._channel;
@@ -375,112 +741,210 @@ class Yate extends EventEmitter {
 		this._connected = true;
 		const _yate = this;
 
-		/**
-		 * Channel object generated by Yate.toChannel method
-		 * @namespace Channel
-		 */
-		const channel = {
-			peerid: null,
-			id: _yate._trackname + "/" + Date.now(),
-			status: null
-		};
-		/** @method Channel.ringing */
-		channel.ringing = (params) => {
-			let ringing = new YateMessage("call.ringing", {
-				id: channel.id,
-				targetid: channel.peerid,
-				earlymedia: true
+		// like YateChannel
+		const chan = new EventEmitter();
+		chan.peerid = _yate._trackname + "/" + process.hrtime()[1];
+		chan.id = null;
+		chan.status = "incoming";
+
+		_yate._setlocal("id", chan.peerid);
+
+		chan.init = (callback, params) => {
+			if (chan.id) {
+				let message = {name: "call.execute", id: chan.id, peerid: chan.peerid, handled: true};
+				if (typeof callback === "object") message.copyParams(callback);
+				if (typeof params === "object") message.copyParams(params);
+				if (typeof callback === "function") callback(message);
+				return Promise.resolve(message);
+			}
+			
+			return new Promise(resolve => {		
+				// append call.execute handler
+				let handler_idx = _yate._installs.length;
+				_yate._installs[handler_idx] = {
+					handler: message => {
+						// remove handler
+						delete _yate._installs[handler_idx];
+						// update peerid
+						chan.id = message.id;
+						chan.status = message.answered || message.autoanswer ? "answered" : message.status;
+						chan.ready = true;
+						// 
+						message.targetid = chan.peerid;
+						message.earlymedia = true;
+						message.handled = true;
+						if (typeof callback === "object") message.copyParams(callback);
+						if (typeof params === "object") message.copyParams(params);
+						_yate.acknowledge(message);
+						//
+						_yate.watch(() => {}, "chan.notify", "id", chan.id); // prevents watch/unwatch till channel lifetime
+						if (typeof callback === "function") callback(message);
+						resolve(message);
+						return;
+					},
+					name: "call.execute",
+					priority: 0
+				};
 			});
-			channel.status = "ringing";
-			if (typeof params === "object") ringing.copyParams(params);
-			return _yate.dispatch(ringing);
 		};
-		/** @method Channel.answered */
-		channel.answered = (params) => {
-			let answered = new YateMessage("call.answered", {
-				id: channel.id,
-				targetid: channel.peerid
-			});
-			channel.status = "answered";
-			if (typeof params === "object") answered.copyParams(params);
-			return _yate.dispatch(answered);
-		};
-		/** @method Channel.hangup */
-		channel.hangup = (reason) => {
-			return _yate.dispatch(new YateMessage("call.drop", {reason: reason, id: channel.id}));
-		};
-		/** @method Channel.callTo */
-		channel.callTo = (dst, params = {}) => {
-			if (typeof dst !== "string") return;
-			let attach = new YateMessage("chan.attach", { notify: channel.id });
+
+		chan.callTo = (dst, params = {}) => {
+			if (!chan.ready || typeof dst !== "string") return Promise.resolve(false);
+		
+			let notify = _yate._trackname + "-notify/" + process.hrtime()[1]; // &lt;-- special targetid for notify handler
+			let eof = true;
+			let timeout;
+			if (typeof params.timeout === "number") timeout = params.timeout;
+			let attach;
+
 			if (dst.startsWith("wave/record")) {
 				// wave/record
-				attach.source = "";
-				attach.consumer = dst;
-				attach.maxlen = 180000; //default 10 sec
+				attach  = new YateMessage("chan.attach", {
+					id: chan.peerid,
+					source: "wave/play/-",
+					consumer: dst,
+					maxlen: 180000, //default 10 sec
+					notify: notify
+				});
+			} else if (dst.startsWith("tone/dtmf")) {
+				// tone/dtmf
+				attach  = new YateMessage("chan.masquerade", {
+					message: "chan.attach",
+					id: chan.id,
+					override: dst,
+					notify: notify
+				});
+				if (!timeout &amp;&amp; dst.startsWith("tone/dtmfstr/")) {
+					timeout = dst.slice(14).length * 250;
+				} else {
+					timeout = 250;
+				}
+				eof = false;
 			} else {
 				// wave/play, tone/
-				attach.source = dst;
-				attach.consumer = "wave/record/-";
-			}
-			if (typeof params === "object") attach.copyParams(params);
-			return new Promise(resolve => {
-				_yate.once("chan.notify", (msg) => {
-					if (msg.targetid === channel.id) resolve(channel);
+				attach  = new YateMessage("chan.attach", {
+					id: chan.peerid,
+					source: dst,
+					consumer: "wave/record/-",
+					notify: notify
 				});
+			}
+
+			if (typeof params === "object") attach.copyParams(params);
+
+			return new Promise((resolve, reject) => {
+				// reset
+				chan.once("reset", reject);
+				// tone
+				if (!eof) {
+					_yate.dispatch(attach)
+						.then(message => { setTimeout(() => {message.reason = "eof"; resolve(message)}, timeout ? timeout : 250) });
+					return;
+				}
+
+				// watcher
+				let handler;
+				_yate.watch(handler = (message) => {
+					clearTimeout(timer);
+					_yate.unwatch(handler, "chan.notify", "targetid", notify);
+					resolve(message);
+					chan.removeListener("reset", reject);
+				}, "chan.notify", "targetid", notify);
+
+				// timeout
+				let timer = setTimeout(() => {
+					_yate.unwatch(handler, "chan.notify", "targetid", notify);
+					attach.reason = "eof";
+					resolve(attach);
+					chan.removeListener("reset", reject);
+				}, timeout ? timeout : _yate._call_timeout);
+
 				_yate.enqueue(attach);
-			})
+			});
 		};
-		/** @method Channel.callJust */
-		channel.callJust = (dst, params = {}) => {
-			if (typeof dst !== "string") return;
-			let execute = new YateMessage("chan.masquerade", {
+
+		chan.callJust = (dst, params) => {
+			if (!chan.ready  || typeof dst !== "string") return Promise.resolve(false);
+
+			let callto = new YateMessage("chan.masquerade", {
 				message: "call.execute",
-				id: channel.peerid,
+				id: chan.id,
 				callto: dst
 			});
-			if (typeof params === "object") execute.copyParams(params);
-			_yate.enqueue(execute);
-			setTimeout(() => {process.exit(0)}, 3);
+
+			if (typeof params === "object") callto.copyParams(params);
+		
+			return _yate.dispatch(callto)
+				.then(() => { setTimeout(() => {process.exit(0)}, 3) });
+		};
+		
+		chan.ringing = (params) => {
+			if (!chan.ready) return Promise.resolve(false);
+
+			let ringing = new YateMessage("call.ringing", {
+				id: chan.peerid,
+				targetid: chan.id
+			});
+			if (typeof params === "object") ringing.copyParams(params);
+			// update status
+			chan.status = chan.status === "answered" ? "answered" : "ringing";
+
+			return _yate.dispatch(ringing);
 		};
 
-		/** 
-		 * @method Channel.init
-		 * @async
-		 * @param {function} callback - initialization callback
-		 * @param {Object} params - params will be attached to first incoming call.execute message
-		 * @returns {YateMessage} - first incoming call.execute message
-		 * @description Channel must be activated before use with init([callback],[params]) method
-		 */
-		channel.init = (callback, params) => {
-			if (channel.peerid) return;
-			_yate.setlocal("id", channel.id);
-			_yate.install(() => {}, "chan.notify", 100, "targetid", channel.id);
-			return new Promise( resolve => {
-				_yate.once("call.execute", (message) => {
-					channel.peerid = message.id;
-					channel.status = message.status;
-					message._handled = true;
-					message.targetid = channel.id;
-					if (typeof callback === "object") message.copyParams(callback);
-					if (typeof params === "object") message.copyParams(params);
-					_yate.acknowledge(message);
-					if (typeof callback === "function") callback(message);
-					resolve(message);
-				})
-			})
+		chan.progress = (params) => {
+			if (!chan.ready) return Promise.resolve(false);
+	
+			let ringing = new YateMessage("call.progress", {
+				id: chan.peerid,
+				targetid: chan.id
+			});
+			if (typeof params === "object") ringing.copyParams(params);
+			// update status
+			chan.status = chan.status === "answered" ? "answered" : "ringing";
+	
+			return _yate.dispatch(ringing);
+		}
+
+		chan.answered = (params) => {
+			if (!chan.ready) return Promise.resolve(false);
+
+			let answered = new YateMessage("call.answered", {
+				id: chan.peerid,
+				targetid: chan.id
+			});
+			if (typeof params === "object") answered.copyParams(params);
+			// update status
+			chan.status = "answered";
+
+			return _yate.dispatch(answered);
 		};
 
-		this._channel = channel;
+		chan.hangup = (reason) => {
+			chan.status = "dropped";
+			return _yate.dispatch(new YateMessage("call.drop", {reason: reason, id: chan.id}))
+				.then(() => { setTimeout(() => {process.exit(0)}, 3) });
+		};
+
+		chan.reset = (message) => { chan.emit("reset", message) };
+
+		chan.watch = (handler, name) => {
+			if (typeof handler !== "function" || typeof name !== "string") return Promise.reject(new Error("Arguments error. Handler and message name required."));
+			return _yate.watch(handler, name, "id", chan.id);
+		};
+	
+		chan.install = (handler, name, priority = 80) => {
+			if (typeof handler !== "function" || typeof name !== "string") return Promise.reject(new Error("Arguments error. Handler and message name required."));
+			return _yate.install(handler, name, priority, "id", chan.id);
+		};
+
+		this._channel = chan;
 
 		let rl = createInterface(this.in);
-		rl.on("line", line => {
-			this._read(line);
-		});
-
+		rl.on("line", line => { this._read(line) });
 		this.emit("_connect");
 
-		return channel;
+		return chan;
 	}
 
 	/**
@@ -496,8 +960,8 @@ class Yate extends EventEmitter {
 	 * Returns set of connection's specific parameners
 	 * @method
 	 * @async
-	 * @param {function} callback
-	 * @returns {Object}
+	 * @returns {Promise} - resolve(Object) where Object is set of connection's specific parameners
+	 * @example
 	 * {
 	 *   version: '6.1.1',
 	 *   release: 'devel1',
@@ -513,9 +977,9 @@ class Yate extends EventEmitter {
 	 *   clientmode: 'false',
 	 *   supervised: 'false',
 	 *   maxworkers: '10'
-	 * }
+	 * };
 	 */
-	getEnvironment(callback) {
+	getEnvironment() {
 		let env = [ 
 			"version", "release", "nodename", "runid", "configname",
 			"sharedpath", "configpath", "cfgsuffix", "modulepath",
@@ -533,30 +997,37 @@ class Yate extends EventEmitter {
 				})
 			})
 		).then(() => {
-			if (typeof callback === "function") callback(ans);
 			return ans;
 		});
 	}
 
 	/**
-	 * Acknowledges the message
+	 * Acknowledges the message.
 	 * Not needed in common cases because of all incoming messages acknowledges automatically
 	 * @method
 	 * @param {YateMessage} message 
+	 * @returns {Promise} - resolve(YateMessage) or reject(Error)
+	 * @async
 	 */
 	acknowledge(msg) {
-		if (typeof msg === "object" &amp;&amp; msg._type === "incoming") { this._acknowledge(msg) }
+		if ("_id" in msg &amp;&amp; "_name" in msg &amp;&amp; "_time" in msg &amp;&amp; "_type" in msg &amp;&amp; msg._type === "incoming") {
+			this._acknowledge(msg);
+			return Promise.resolve(msg);
+		} else {
+			return Promise.reject(new Error("Invalid message: " + msg));
+		}
 	}
 
 	/**
 	 * Sets the handler to a specific message.
-	 * The yate engine will wait for a response to its message.
 	 * @method
-	 * @param {function} callback - function to be message handler (required)
+	 * @param {function} handler - message handler (required)
 	 * @param {string} name - message name (required)
-	 * @param {number} priority - priority of the handler, as low value as high proirity (optional, default 100)
-	 * @param {string} filter - set the filter to message parameter (optional, for example "called")
-	 * @param {string} fvalue - filter value (optional, for example "^9999.*")
+	 * @param {number} prio - priority of the handler on Yate's side, as low value as high proirity (optional, default value 100)
+	 * @param {string} filter - filter is name of message parameter (optional, for example "called")
+	 * @param {string} fvalue - filter is value of message parameter (optional, for example "^9999.*")
+	 * @returns {Promise} - resolve(true) on successfully installed handler, resolve(false) on fail, reject(Error) on error
+	 * @async
 	 * @example
 	 * const {Yate, YateMessage} = require("next-yate");
 	 *
@@ -566,110 +1037,150 @@ class Yate extends EventEmitter {
 	 *
 	 * let yate = new Yate();
 	 * yate.init();
-	 * yate.install(onRoute, "call.route", 90, "called", "^9999.*"); // set the handler to "call.route" messages where parameter message.called begins with "9999", handler has priority 90
+	 * yate.install(onRoute, "call.route", 90, "called", "^9999.*");
 	 * @see YateMessage
 	 * @see https://docs.yate.ro/wiki/Standard_Messages
 	 */
-	install(callback, name, priority, filter, fvalue) {
-		let _yate = this;
-		if (typeof callback === "function" &amp;&amp; typeof name === "string") {
-			if (typeof priority !== "number") {
-				fvalue = typeof filter === "string" ? filter : undefined;
-				filter = typeof priority === "string" ? priority : undefined;
-				priority = 100;
+	install(handler, name, prio, filter, fvalue) {
+		if (typeof handler !== "function" || typeof name !== "string")
+			return Promise.reject(new Error("Install arguments error. Handler and Message name are required."));
+		
+		let priority = 100;
+		let filterName;
+		let filterValue;
+		if (typeof prio !== "number") {
+			priority = 100;
+			filterName = typeof prio === "string" ? prio : undefined;
+			filterValue = typeof filter === "string" ? filter : undefined;
+		} else {
+			priority = prio;
+			filterName = typeof filter === "string" ? filter : undefined;
+			filterValue = typeof fvalue === "string" ? fvalue : undefined;
+		}
+
+		// add / replace installed
+		let installed = false;
+		let replace = -1;
+		let add = this._installs.length;
+		let reinstall = false;
+		for (let i = 0; i &lt; this._installs.length; i++) {
+			if (!this._installs[i]) add = i;
+			if (this._installs[i] &amp;&amp; this._installs[i].name === name) {
+				installed = true;
+				if (this._installs[i].priority !== priority) reinstall = true;
+				if (this._installs[i].filterName === filterName &amp;&amp; this._installs[i].filterValue === filterValue) replace = i;
 			}
-			// 1. query yate to install the handler
-			this._install(name, priority, filter, fvalue);
-			// 2. waiting for answer
-			this.once("_install," + name, success => {
-				// 3. on successful answer set the callback handler
-				if (!success) return;
-				// replace existing handler or append new one
-				let idx = this._installs.length;
-				for (let i = 0; i &lt; this._installs.length; i++) {
-					if (this._installs[i].name === name) {
-						idx = i;
-						break;
-					}
-				}
-				this._installs[idx] = {
-					callback: callback,
-					name: name,
-					priority: priority,
-					filter: filter,
-					fvalue: fvalue
-				};
-				this.on(name, message => {
-					// setup acknowledge by timeout
-					let timeout = setTimeout(() => {
-						_yate.emit("_debug", "&lt;" +_yate._trackname + ":WARN> " + message._id + " Message '" + message._name + "' acknowledge timeout!");
-						this._acknowledge(message);
-					}, this._acknowledge_timeout);
+		}
+		let idx = replace &lt; 0 ? add : replace;
+		this._installs[idx] = {
+			name: name,
+			handler: handler,
+			priority: priority,
+			filterName: filterName,
+			filterValue: filterValue
+		};
 
-					// 4. promisify the (callback + acknowledge) )
-					let calltype = Object.getPrototypeOf(callback).constructor.name;
-					let promise; // it can be promise
-					if (calltype === "AsyncFunction" || calltype === "Promise")	promise = callback;
-					else promise = (msg) =>	new Promise( (resolve) => { resolve(callback(msg)) });
-
-					// 5. attach acknowledge
-					return promise(message).then((ans) => {
-							clearTimeout(timeout);
-							if (message._acknowledged) {
-								// WARN message already acknowledged
-								_yate.emit("_debug", "&lt;" + _yate._trackname + ":WARN> " + message._id + " Message '" + message._name + "' already acknowledged!");
-								return;
-							}
-							if (typeof ans === "boolean") {
-								// if answer is boolean -> message.processed -> ack
-								message._handled = ans;
-								this._acknowledge(message);
-								return;
-							}
-							if (ans &amp;&amp; typeof ans === "object") {
-								// if answer is changed message -> ack
-								if (ans._id === message._id) {
-									this._acknowledge(ans);
-									return;
-								}
-							}
-                            this._acknowledge(message); // EVERY message must be acknowledged!
-                            
-						}).catch(() => this._acknowledge(message)); // ...on error too
+		if (!installed) {
+			// install
+			this._install(name, priority);
+			return new Promise(resolve => {
+				this.once("_install," + name, success => {
+					if (!success) delete this._installs[idx];
+					resolve(success);
 				});
 			});
-		} else throw new Error("Install message handler error!\nMethod install(callback, name, priority, filter, fvalue)");
+		} else if(reinstall) {
+			// reinstall with new priority
+			this._uninstall(name);
+			this._install(name, priority);
+			return new Promise(resolve => {
+				this.once("_install," + name, success => {
+					if (!success) delete this._installs[idx];
+					resolve(success);
+				});
+			});
+		} else {
+			return Promise.resolve(true);
+		}
 	}
 
 	/**
-	 * Removes the handler from a specific Engine message
+	 * Removes the handler from a specific message
 	 * @method
 	 * @param {string} name - message name (required)
+	 * @returns {Promise} - resolve(true) if message handler removed from Yate's side, resolve(false) if no, reject(Error) on error.
+	 * @async
 	 * @example
 	 * yate.uninstall("call.route");
 	 * @see Yate#install
 	 */
-	uninstall(name) {
-		if (typeof name === "string") {
-			this.once("_uninstall," + name, success => {
-				if (!success) return;
-				this.removeAllListeners(name);
-				for (let i = 0; i &lt; this._installs.length; i++)
-					if (this._installs[i].name === name) {
-						delete this._installs[i];
-						break;
-					}
-			});
+	uninstall(...args) {
+		// parse arguments
+		let handler, name, priority, filterName, filterValue;
+		
+		if (args.length > 4) {
+			handler = typeof args[0] === "function" ? args[0] : undefined;
+			name = typeof args[1] === "string" ? args[1] : undefined;
+			priority = typeof args[2] === "number" ? args[2] : undefined;
+			filterName = typeof args[3] === "string" ? args[3] : undefined;
+			filterValue = typeof args[4] === "string" ? args[4] : undefined;
+		} else if (args.length > 3) {
+			handler = typeof args[0] === "function" ? args[0] : undefined;
+			name = typeof args[1] === "string" ? args[1] : undefined;
+			filterName = typeof args[2] === "string" ? args[2] : undefined;
+			filterValue = typeof args[3] === "string" ? args[3] : undefined;
+		} else if(args.length > 2) {
+			name = typeof args[0] === "string" ? args[0] : undefined;
+			filterName = typeof args[1] === "string" ? args[1] : undefined;
+			filterValue = typeof args[2] === "string" ? args[2] : undefined;
+		} else if(args.length > 1) {
+			handler = typeof args[0] === "function" ? args[0] : undefined;
+			name = typeof args[1] === "string" ? args[1] : undefined;
+		} else if(args.length > 0){
+			name = typeof args[0] === "string" ? args[0] : undefined;
+		}
+
+		if (!name) return Promise.reject(Error("Uninstall arguments error. Message name required."));
+
+		// remove handlers
+		for (let i = 0; i &lt; this._installs.length; i++) {
+			if (this._installs[i] &amp;&amp; this._installs[i].name === name) {
+				if (filterName &amp;&amp; this._installs[i].filterName !== filterName) continue;
+				if (filterValue &amp;&amp; this._installs[i].filterValue !== filterValue) continue;
+				if (priority &amp;&amp; this._installs[i].priority !== priority) continue;
+				if (handler &amp;&amp; this._installs[i].handler !== handler) continue;
+				if (!handler &amp;&amp; !filterName &amp;&amp; !filterValue &amp;&amp; this._installs[i].filterName &amp;&amp; this._installs[i].filterValue) continue;
+				delete this._installs[i];
+			}
+		}
+
+		// uninstall if have no handlers
+		let installed = false;
+		for (let i = 0; i &lt; this._installs.length; i++) {
+			if (this._installs[i] &amp;&amp; this._installs[i].name === name) {
+				installed = true;
+				break;
+			}
+		}
+
+		if (!installed) {
 			this._uninstall(name);
-		} else throw new Error("Uninstall message handler error!\nMethod uinstall(name)");
+			return new Promise(resolve => {
+				this.on("_uninstall," + name, success => resolve(success));
+			});
+		} else {
+			return Promise.resolve(false);
+		}
 	}
 
 	/**
 	 * Sets the handler to a specific yate message.
 	 * In contrast to the method of Yate.install it does not require an answer to message. You will get already handled messages.
 	 * @method
-	 * @param {function} callback - function to be message handler (required)
+	 * @param {function} handler - function to be message handler (required)
 	 * @param {string} name - message name (required)
+	 * @returns {Promise} - resolve(true) on successfully installed handler, resolve(false) on fail, reject(Error) on error.
+	 * @async
 	 * @example
 	 * const {Yate, YateMessage} = require("next-yate");
 	 *
@@ -683,103 +1194,131 @@ class Yate extends EventEmitter {
 	 * @see https://docs.yate.ro/wiki/Standard_Messages
 	 * @see Yate#install
 	 */
-	watch(callback, name) {
-		if (typeof callback === "function" &amp;&amp; typeof name === "string") {
-			this.once("_watch," + name, success => {
-				if (!success) return;
-				this.on(name, callback);
-				//
-				let idx = this._watches.length;
-				for (let i = 0; i &lt; this._watches.length; i++)
-					if (this._watches[i].name === name) {
-						idx = i;
-						break;
-					}
-				this._watches[idx] = { callback: callback, name: name };
-				//
-			});
+	watch(handler, name, filterName, filterValue) {
+		if (typeof handler !== "function" || typeof name !== "string")
+			return Promise.reject(new Error("Watch arguments error. Handler and message name are required."));
+
+		// add / replace watched
+		let watched = false;
+		let replace = -1;
+		let add = this._watches.length;
+		for (let i = 0; i &lt; this._watches.length; i++) {
+			if (!this._watches[i]) add = i;
+			if (this._watches[i] &amp;&amp; this._watches[i].name === name) {
+				watched = true;
+				if (this._watches[i].filterName === filterName &amp;&amp; this._watches[i].filterValue === filterValue) replace = i;
+			}
+		}
+		
+		let idx = replace &lt; 0 ? add : replace;
+		this._watches[idx] = {
+			name: name,
+			handler: handler,
+			filterName: typeof filterName === "string" ? filterName : undefined,
+			filterValue: typeof filterValue === "string" ? filterValue : undefined
+		};
+		if (!watched) {
+			// watch
 			this._watch(name);
-		} else throw new Error("Watch message handler error!\nMethod watch(callback, name)");
+			return new Promise(resolve => {
+				this.once("_watch," + name, success => {
+					if (!success) delete this._watches[idx];
+					resolve(success);
+				});
+			});
+		} else {
+			return Promise.resolve(true);
+		}
 	}
 
 	/**
-	 * Removes the watch handler from a specific yate message
+	 * Removes the watch handler from a specific yate message.
 	 * @method
 	 * @param {string} name - message name (required)
+	 * @returns {Promise} - resolve(true) if message handler removed from Yate's side, resolve(false) if no, reject(Error) on error.
+	 * @async
 	 * @example
 	 * yate.unwatch("engine.timer");
 	 * @see Yate#watch
 	 */
-	unwatch(name) {
-		if (typeof name === "string") {
-			this.once("_unwatch," + name, success => {
-				if (!success) return;
-				this.removeAllListeners(name);
-				for (let i = 0; i &lt; this._watches.length; i++)
-					if (this._watches[i].name === name) {
-						delete this._watches[i];
-						break;
-					}
-			});
+	unwatch(...args) {
+		// parse arguments
+		let handler, name, filterName, filterValue;
+		
+		if (args.length > 3) {
+			handler = typeof args[0] === "function" ? args[0] : undefined;
+			name = typeof args[1] === "string" ? args[1] : undefined;
+			filterName = typeof args[2] === "string" ? args[2] : undefined;
+			filterValue = typeof args[3] === "string" ? args[3] : undefined;
+		} else if(args.length > 2) {
+			name = typeof args[0] === "string" ? args[0] : undefined;
+			filterName = typeof args[1] === "string" ? args[1] : undefined;
+			filterValue = typeof args[2] === "string" ? args[2] : undefined;
+		} else if(args.length > 1) {
+			handler = typeof args[0] === "function" ? args[0] : undefined;
+			name = typeof args[1] === "string" ? args[1] : undefined;
+		} else if(args.length > 0){
+			name = typeof args[0] === "string" ? args[0] : undefined;
+		}
+
+		if (!name) throw Error("Unwatch function arguments error. Message name is require.");
+
+		// remove handlers
+		for (let i = 0; i &lt; this._watches.length; i++) {
+			if (this._watches[i] &amp;&amp; this._watches[i].name === name) {
+				if (filterName &amp;&amp; this._watches[i].filterName !== filterName) continue;
+				if (filterValue &amp;&amp; this._watches[i].filterValue !== filterValue) continue;
+				if (handler &amp;&amp; this._watches[i].handler !== handler) continue;
+				if (!handler &amp;&amp; !filterName &amp;&amp; !filterValue &amp;&amp; this._watches[i].filterName &amp;&amp; this._watches[i].filterValue) continue;
+				delete this._watches[i];
+			}
+		}
+
+		// unwatch if have no handlers
+		let watched = false;
+		for (let i = 0; i &lt; this._watches.length; i++) {
+			if (this._watches[i] &amp;&amp; this._watches[i].name === name) {
+				watched = true;
+				break;
+			}
+		}
+
+		if (!watched) {
 			this._unwatch(name);
-		} else throw new Error("Unwatch message handler error!\nMethod unwatch(name)");
+			return new Promise(resolve => {
+				this.on("_uninstall," + name, success => resolve(success));
+			});
+		} else {
+			return Promise.resolve(false);
+		}
 	}
 
 	/**
-	 * Set/change/read extmodule connection parameters.
+	 * Set/change/read connection parameters.
 	 * @method
-	 * @param {function} callback - result handler (optional, if undefined returns promisyfied value)
 	 * @param {string} name - parameter name (required)
 	 * @param {string} value - parameter value (optional, if undefined the method returns the parameter value)
+	 * @returns {Promise} - resolve(value or success)
 	 * @async
 	 * @example
 	 * const {Yate, YateMessage} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
-	 * // callback variant
-	 * yate.setlocal(console.log, "engine.version"); // output value to console
-	 * // or async/await variant
 	 * let ver = await yate.setlocal("engine.version");
 	 * console.log(ver);
 	 * @see https://docs.yate.ro/wiki/External_module_command_flow
 	 */
-	setlocal(callback, name, value) {
-		// callback version
-		if (
-            typeof callback === "function" &amp;&amp; typeof name === "string" &amp;&amp;
-            (typeof value === "string" || typeof value === "boolean" || typeof value === "number" || value === undefined)
-        ) {
-			this.once("_setlocal," + name, (ans) => {
-				// push or replace to setlocals []
-				if (value !== undefined &amp;&amp; ans._success) {
-					let idx = this._setlocals.length;
-					for (let i = 0; i &lt; this._setlocals.length; i++) {
-						if (this._setlocals[i].name === name) {
-							idx = i;
-							break;
-						}
-					}
-					this._setlocals[idx] = { name: name, value: value };
-				}
-				callback(ans._success ? ans._retvalue : undefined );
-			});
-			this._setlocal(name, value);
-			return;
-		}
-		// or promise version without callback
-		if ( typeof callback === "string" &amp;&amp;
-			(typeof name === "string" || typeof name === "boolean" || typeof name === "number" || value === undefined)
-		) {
-			value = name;
-			name = callback;
+	setlocal(name, value) {
+		if (typeof name === "string" &amp;&amp; (
+			typeof value === "string" ||
+			typeof value === "boolean" ||
+			typeof name === "number" ||
+			value === undefined) ) {
+
 			return new Promise( (resolve) => {
 				this._setlocal(name, value);
 				let event = "_setlocal," + name;
-				// kill the slow setlocal query by timeout
-				let timeout = setTimeout(() => {
-					this.removeListener(event, resolve);
-					resolve(undefined);
-				}, this._dispatch_timeout);
+				//let handler;
 
 				this.once(event, (ans) => {
 					clearTimeout(timeout);
@@ -796,7 +1335,16 @@ class Yate extends EventEmitter {
 					}
 					resolve(ans._success ? ans._retvalue : undefined );
 				});
+
+				// skip setlocal query by timeout
+				let timeout = setTimeout(() => {
+					//this.removeListener(event, handler);
+					resolve(false);
+				}, this._dispatch_timeout);
+
 			});
+		} else {
+			return Promise.reject(new Error("Setlocal arguments error. At least name required."));
 		}
 	}
 
@@ -804,6 +1352,8 @@ class Yate extends EventEmitter {
 	 * Enqueues the Message in the Yate engine
 	 * @method
 	 * @param {YateMessage} message (required)
+	 * @returns {Promise} - resolve(YateMessage) with unhandled message or reject(Error) on error
+	 * @async
 	 * @example
 	 * const {Yate, YateMessage} = require("next-yate");
 	 * let yate = new Yate();
@@ -812,54 +1362,51 @@ class Yate extends EventEmitter {
 	 * yate.equeue(m);
 	 * @see Yate#dispatch
 	 */
-	enqueue(message) { this._dispatch(message) }
+	enqueue(msg) {
+		if ("_id" in msg &amp;&amp; "_name" in msg &amp;&amp; "_time" in msg) {
+			this._dispatch(msg);
+			return Promise.resolve(msg);
+		} else {
+			return Promise.reject(new Error("Equeue arguments error. YateMessage required."));
+		}
+	}
 
 	/**
-	 * Dispatches the Message in the Yate engine
+	 * Dispatches the Message in the Yate engine.
 	 * @method
-	 * @param {Function} callback - Callback function (optional, if undefined returns promisyfied value)
 	 * @param {YateMessage} message (required)
+	 * @returns {Promise} - reolve(YateMessage) where YateMessage is handled message, reject(Error) on error
 	 * @async
 	 * @example
 	 * const {Yate, YateMessage} = require("next-yate");
 	 * let yate = new Yate();
 	 * yate.init();
-	 * // callback variant
 	 * let m = new YateMessage("call.route", false, { id: "test/1", caller: "123", called: "321" });
-	 * yate.dispatch(res => console.log(res.retValue()), m); // Output to console call.route request result
-	 * // or async/await variant
-	 * let res = await yate.dispatch(m);
-	 * console.log(res.retValue());
+	 * yate.dispatch(m)
+	 *     .then(res => {console.log("Successfully dispatched\n", res.retValue())},
+	 *           err => {console.log("Dispatch error\n", err)} );
 	 * @see Yate#enqueue
 	 */
-	dispatch(callback, msg) {
-		// callback version
-		if (typeof callback === "function" &amp;&amp; msg) {
-			if ("_id" in msg &amp;&amp; "_name" in msg &amp;&amp; "_time" in msg) {
+	dispatch(msg) {
+		if ("_id" in msg &amp;&amp; "_name" in msg &amp;&amp; "_time" in msg ) {
+			return new Promise(resolve => {
 				this._dispatch(msg);
-				this.once("_answer," + msg._id, callback);
-			}
-			return;
-		}
-		// promise version without callback
-		if (callback &amp;&amp; typeof callback === "object") {
-			if ( "_id" in callback &amp;&amp; "_name" in callback &amp;&amp; "_time" in callback ) {
-				msg = callback;
-				return new Promise(resolve => {
-					this._dispatch(msg);
-					let event = "_answer," + msg._id;
-					// kill the slow dispatch by timeout
-					let timeout = setTimeout(() => {
-						this.removeListener(event, resolve);
-						msg._handled = false;
-						resolve(msg);
-					}, this._dispatch_timeout);
-					this.once(event, (m) => {
-						clearTimeout(timeout);
-						resolve(m);
-					});
+				let event = "_answer," + msg._id;
+				let handler;
+				
+				this.once(event, handler = (m) => {
+					clearTimeout(timeout);
+					resolve(m);
 				});
-			}
+				// kill slow dispatches by timeout
+				let timeout = setTimeout(() => {
+					this.removeListener(event, handler);
+					msg._handled = false;
+					resolve(msg);
+				}, this._dispatch_timeout);
+			});
+		} else {
+			return Promise.reject(new Error("Dispach arguments error. YateMessage required."));
 		}
 	}
 
@@ -876,33 +1423,78 @@ class Yate extends EventEmitter {
 	_read(line) {
 		if (this._debug) this.emit("_debug", "&lt;-- " + line);
 		let msg = _parseMessage(line);
+		msg._yate = this; // append link to parent Yate
 		switch (msg._type) {
-			case "error":
-				this.emit("_error", msg._retvalue);
-				break;
-			case "setlocal":
-				this.emit("_setlocal," + msg._name, msg);
+			case "answer":
+				this.emit("_answer," + msg._id, msg); // _answer,id = dispatch result
 				break;
 			case "incoming":
-				this.emit(msg._name, msg); // installed
-				break;
-			case "uninstall":
-				this.emit("_uninstall," + msg._name, msg._success);
+				// installed
+				// eslint-disable-next-line no-case-declarations
+				let promises = [];
+				this._installs.forEach(item => {
+					if (item.name === msg.name &amp;&amp; typeof item.handler === "function") {
+						if (typeof item.filterName === "string" &amp;&amp; typeof item.filterValue === "string") {
+							if (item.filterName in msg &amp;&amp; RegExp(item.filterValue).test(msg[item.filterName])) {
+								promises.push(item.handler(msg));
+							}
+						} else {
+							promises.push(item.handler(msg));
+						}
+					}
+				});
+				if (promises.length > 0) {
+					Promise.all(promises)
+						.then(res => {
+							for (let i = 0; i &lt; res.length; i++) {
+								if (typeof res[i] === "boolean" &amp;&amp; res[i]) {
+									msg._handled = true;
+									break;
+								}
+							}
+							this._acknowledge(msg);
+						});
+				} else {
+					this._acknowledge(msg);
+				}
 				break;
 			case "notification":
-				this.emit(msg._name, msg); // watched
+				// watched
+				this._watches.forEach(item => {
+					if (item.name === msg.name &amp;&amp; typeof item.handler === "function") {
+						if (typeof item.filterName === "string" &amp;&amp; typeof item.filterValue === "string") {
+							if (item.filterName in msg &amp;&amp; RegExp(item.filterValue).test(msg[item.filterName])) {
+								item.handler(msg);
+							}
+						} else {
+							item.handler(msg);
+						}
+					}
+				});
 				break;
+
 			case "install":
-				this.emit("_install," + msg._name, msg._success);
+				this.emit("_install," + msg._name, msg._success); // _install,event = install result
 				break;
-			case "answer":
-				this.emit("_answer," + msg._id, msg); // dispatched
+
+			case "uninstall":
+				this.emit("_uninstall," + msg._name, msg._success); // _uninstall,event = uninstall result
 				break;
+
 			case "watch":
-				this.emit("_watch," + msg._name, msg._success);
+				this.emit("_watch," + msg._name, msg._success); // _watch,event = watch result
 				break;
+
 			case "unwatch":
-				this.emit("_unwatch," + msg._name, msg._success);
+				this.emit("_unwatch," + msg._name, msg._success); // _unwatch,event = _unwatch result
+				break;
+
+			case "setlocal":
+				this.emit("_setlocal," + msg._name, msg); // _setlocal,event = _setlocal result
+				break;
+
+			case "error":
+				this.emit("_error", msg._retvalue);
 		}
 	}
 
@@ -911,12 +1503,22 @@ class Yate extends EventEmitter {
 	 */
 	_write(line) {
 		if (line.length > this.bufsize) line = line.substr(0, this.bufsize); // trim the line to max buffer size
-		if (!this._connected) {
+		if (this._connected) {
+			if (this._debug) this.emit("_debug", "--> " + line);
+			try { this.out.write(line.endsWith("\n") ? line : line + "\n"); }
+			catch(error) {
+				this._connected = false;
+				if (this._timer) clearTimeout(this._timer);
+				if (this._debug) this.emit("_debug", "&lt;I/O> error");
+				if (this._reconnect) {
+					this._timer = setTimeout(() => { this.init().then(() => this._restore()) }, this._reconnnect_timeout);
+				} else {
+					this.emit("_error", error);
+				}
+			}
+		} else {
 			// scheduled line
 			this.once("_connect", () => { this._write(line) });
-		} else {
-			if (this._debug) this.emit("_debug", "--> " + line);
-			this.out.write(line.endsWith("\n") ? line : line + "\n");
 		}
 	}
 
@@ -974,7 +1576,7 @@ class Yate extends EventEmitter {
 }
 
 /*
- * Dump stream to string
+ * Dump stream to string.
  * Emits the event "dump" when dump is finished
  */
 class DumpStream extends Writable {
@@ -990,7 +1592,7 @@ class DumpStream extends Writable {
 }
 
 /*
- * External module protocol, direction application &lt;- engine
+ * External module protocol, direction application &lt;- engine.
  * https://docs.yate.ro/wiki/External_module_command_flow
  */
 function _parseMessage(str) {
@@ -1029,6 +1631,11 @@ function _parseMessage(str) {
 			params._success = _str2bool(arg[2]);
 			params._type = "watch";
 			break;
+		case "%%&lt;unwatch": // %%&lt;watch:&lt;name>:&lt;success>
+			params._name = arg[1];
+			params._success = _str2bool(arg[2]);
+			params._type = "unwatch";
+			break;
 		case "%%&lt;setlocal": // %%&lt;setlocal:&lt;name>:&lt;value>:&lt;success>
 			params._name = arg[1];
 			params._retvalue = _unescape(arg[2]);
@@ -1037,6 +1644,7 @@ function _parseMessage(str) {
 			break;
 		case "Error in":
 		default:
+			//params._name = "error";
 			params._type = "error";
 			params._retvalue = str;
 	}
@@ -1138,6 +1746,7 @@ function _obj2str(obj, rootkey) {
 	for (let key in obj) {
 		if (("" + key).charAt(0) === "_") continue;
 		if (typeof obj[key] === "function") continue;
+		if (typeof obj[key] === "undefined") continue;
 		if (typeof obj[key] === "object") {
 			let subobj = _obj2str(obj[key], key);
 			for (let subkey in subobj) {
@@ -1209,6 +1818,7 @@ function _deepCopy(dst, src, prefix = "_", skip = true) {
 module.exports = {
 	Yate,
 	YateMessage,
+	YateChannel,
 	DumpStream
 };
 </code></pre>
@@ -1221,13 +1831,13 @@ module.exports = {
 </div>
 
 <nav>
-    <h2><a href="index.html">Home</a></h2><h3>Namespaces</h3><ul><li><a href="Channel.html">Channel</a></li></ul><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul>
+    <h2><a href="index.html">Home</a></h2><h3>Classes</h3><ul><li><a href="Yate.html">Yate</a></li><li><a href="YateChannel.html">YateChannel</a></li><li><a href="YateMessage.html">YateMessage</a></li></ul>
 </nav>
 
 <br class="clear">
 
 <footer>
-    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Wed Feb 26 2020 20:27:21 GMT+0300 (Москва, стандартное время)
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 3.6.3</a> on Tue Apr 14 2020 17:20:08 GMT+0300 (Москва, стандартное время)
 </footer>
 
 <script> prettyPrint(); </script>
