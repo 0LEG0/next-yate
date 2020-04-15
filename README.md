@@ -157,7 +157,7 @@ IVR Description:
 - **Echotest Menu**
 1. Setup the DTMF handler:
 
-    _1 = Repeat Callerid_
+    _1 = Repeat Echotest_
 
     _0 = Return to the Welcome menu_
 
@@ -245,12 +245,12 @@ async function callerid(chan) {
 
     // Change DTMF handler: 
     chan.watch(dtmf => {
-        if (dtmf.text === "0") {
+        if (dtmf.text === "1") {
             chan.reset();
             callerid(chan);
         } else if (dtmf.text === "0") {
             chan.reset();
-            callerid(chan);
+            welcome(chan);
         }
     }, "chan.dtmf");
 
@@ -289,9 +289,12 @@ async function echo(chan) {
     if (!chan.ready) return;
 
     chan.watch(dtmf => {
-        if (dtmf.text === "0") {
+        if (dtmf.text === "1") {
             chan.reset();
             echo(chan);
+        } else if (dtmf.text === "0") {
+            chan.reset();
+            welcome(chan);
         }
     }, "chan.dtmf");
 
