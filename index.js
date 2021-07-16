@@ -437,6 +437,23 @@ class YateMessage {
 	getColumn() {} // TODO
 	getRow() {} // TODO
 	getResult() {} // TODO
+	toString() {
+		let str = `YateMessage {\n  name: ${this._name},\n  id: ${this._id},\n  time: ${this._time},\n  type: ${this._type},\n  handled: ${this._handled},\n`;
+		for (let key in this) {
+			if (key.startsWith("_")) continue;
+			if (typeof this[key] === "function") {
+				str += key + ": [Function],\n";
+				continue;
+			}
+			if (typeof this[key] == "object"){
+				str += key + ": [Object],\n";
+				continue;
+			}
+			str += "  " + key + ": " + this[key] + ",\n";
+		}
+		str += `  retValue: ${this._retvalue}\n}`;
+		return str;
+	}
 }
 Object.defineProperties(YateMessage.prototype, {
 	getParam: { writable: false },
@@ -646,13 +663,15 @@ class Yate extends EventEmitter {
 		});
 
 		return new Promise(resolve => {
-			this._socket.on("ready", () => {
+			// NodeJS versions before v10.x do not sends "ready" event
+			this._socket.on(process.version.search(/^v[0-9]\./) == -1 ? "ready" : "connect", () => {
 				// workaround for socket case: "end" just after "connect"
 				this._timer = setTimeout(() => {
 					this.in = this.out = this._socket;
 					this._connected = true;
 					let rl = createInterface(this.in);
 					rl.on("line", line => { this._read(line) });
+					this._connect("global", this._trackname, "data");
 					this.emit("_connect");
 					resolve(true);
 				}, 500); //
@@ -1497,7 +1516,7 @@ class Yate extends EventEmitter {
 	// %%>connect:<role>[:<id>][:<type>]
 	_connect(role, id, type) {
 		if (role.match(/^(global|channel|play|record|playrec)$/))
-			this._write("%%>connect:" + role + ":" + _escape(id) + ":" + _escape(type));
+			this._write("%%>connect:" + role + (id ? ":" + _escape(id) : "") + (type ? ":" + _escape(type) : ""));
 	}
 
 	// %%>output:arbitrary unescaped string
@@ -1616,7 +1635,7 @@ function _parseMessage(str) {
 			break;
 		case "Error in":
 		default:
-			//params._name = "error";
+			params._name = "error";
 			params._type = "error";
 			params._retvalue = str;
 	}
