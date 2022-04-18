@@ -13,7 +13,7 @@
 
 (* Compatibility with javascript.yate has been moved to [Next-Yate-Compat](https://github.com/0LEG0/next-yate-compat))
 
-[View Documentation](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
+[View API](API.md)
 
 [External module protocol](https://docs.yate.ro/wiki/External_module_command_flow)
 
@@ -326,8 +326,8 @@ async function echo(chan) {
 ```
 
 ### More examples
-[/examples](https://github.com/0LEG0/next-yate/tree/master/examples)
+[examples](https://github.com/0LEG0/next-yate/tree/master/examples)
 
 ### API
-[View Documentation](https://htmlpreview.github.io/?https://github.com/0LEG0/next-yate/blob/master/docs/index.html)
+[View API](API.md)
 
