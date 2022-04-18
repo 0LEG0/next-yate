@@ -391,7 +391,7 @@ class YateMessage {
 		if (name === "name") return this._name; // workaround
 		if (name === "broadcast") return this._broadcast; // workaround
 		if (this[name] === "undefined") return defValue;
-		return autoNumber ? this[name] : this[name] + "";
+		return autoNumber ? this[name] + "" : this[name];
 	}
 	/**
 	 * @method
@@ -490,26 +490,23 @@ Object.defineProperties(YateMessage.prototype, {
  * @see https://docs.yate.ro/wiki/External_module_command_flow
  */
 class Yate extends EventEmitter {
-	constructor(options) {
+	constructor(options = {}) {
 		super();
-
-		if (typeof options !== "object") options = {};
-
 		this._socket = null;
 		this._connected = false;
 		this._debug = "debug" in options ? options.debug : false;
 		this._host = options.host; // "127.0.0.1"
-		this._port = options.port ? options.port : _PORT;
+		this._port = (typeof options.port == "number") ? options.port : _PORT;
 		this._path = options.path; // "socket path"
 		this._reconnect = "reconnect" in options ? options.reconnect : true;
-		this._reconnnect_timeout = options.reconnnect_timeout ? options.reconnnect_timeout : _RECONNECT_TIMEOUT;
-		this._dispatch_timeout = options.dispatch_timeout ? options.dispatch_timeout : _DISPATCH_TIMEOUT;
-		this._acknowledge_timeout = options.acknowledge_timeout ? options.acknowledge_timeout : _ACKNOWLEDGE_TIMEOUT;
-		this._bufsize = options.bufsize ? options.bufsize : _BUFFER_SIZE;
-		this._trackname = options.trackname ? options.trackname : _TRACKNAME;
+		this._reconnnect_timeout = (typeof options.reconnnect_timeout == "number") ? options.reconnnect_timeout : _RECONNECT_TIMEOUT;
+		this._dispatch_timeout = (typeof options.dispatch_timeout == "number") ? options.dispatch_timeout : _DISPATCH_TIMEOUT;
+		this._acknowledge_timeout = (typeof options.acknowledge_timeout == "number") ? options.acknowledge_timeout : _ACKNOWLEDGE_TIMEOUT;
+		this._bufsize = (typeof options.bufsize == "number") ? options.bufsize : _BUFFER_SIZE;
+		this._trackname = (typeof options.trackname == "string") ? options.trackname : _TRACKNAME;
 		this._channel = "channel" in options ? options.channel : false;
-		this.setMaxListeners(options.queue ? options.queue : _OFFLINE_QUEUE);
-		this._call_timeout = options.call_timeout ? options.call_timeout : _CALL_TIMEOUT;
+		this.setMaxListeners((typeof options.queue == "number") ? options.queue : _OFFLINE_QUEUE);
+		this._call_timeout = (typeof options.call_timeout == "number") ? options.call_timeout : _CALL_TIMEOUT;
 		this._first_run = true;
 
 		/*
@@ -562,11 +559,21 @@ class Yate extends EventEmitter {
 	get connected() { return this._connected }
 	set connected(value) {} // readonly
 	get bufsize() { return this._bufsize }
-	set bufsize(value) { if (typeof value === "number" && /^\d{3,5}$/.test("" + value) ) this.setlocal(() => {this._bufsize = value}, "bufsize", value)}
+	set bufsize(value) {
+		if (typeof value === "number" && /^\d{3,5}$/.test("" + value) ) {
+			this.setlocal("bufsize", value);
+			this._bufsize = value;
+		}
+	}
 	get dispatch_timeout() { return this._dispatch_timeout }
 	set dispatch_timeout(value) { if (typeof value === "number" && /^\d{3,}$/.test("" + value) ) this._dispatch_timeout = value }
 	get acknowledge_timeout() { return this._acknowledge_timeout }
-	set acknowledge_timeout(value) { if (typeof value === "number" && /^\d{3,}$/.test("" + value) ) this.setlocal(() => {this._acknowledge_timeout = value}, "timeout", value)}
+	set acknowledge_timeout(value) {
+		if (typeof value === "number" && /^\d{3,}$/.test("" + value) ) {
+			this.setlocal("timeout", value);
+			this._acknowledge_timeout = value;
+		}
+	}
 	get channel() { return this._channel }
 	set channel(value) {} // readonly
 	get socket() { return this._socket }
@@ -632,7 +639,7 @@ class Yate extends EventEmitter {
 		this._socket.once("end", () => {
 			this._connected = false;
 			if (this._timer) clearTimeout(this._timer); // (*)
-			this.emit("_disconnect");
+			this.emit("_disconnect", "Lost connection");
 			if (this._reconnect) {
 				this._timer = setTimeout(() => {
 					if (this._first_run) {
@@ -1303,7 +1310,7 @@ class Yate extends EventEmitter {
 		if (typeof name === "string" && (
 			typeof value === "string" ||
 			typeof value === "boolean" ||
-			typeof name === "number" ||
+			typeof value === "number" ||
 			value === undefined) ) {
 
 			return new Promise( (resolve) => {
