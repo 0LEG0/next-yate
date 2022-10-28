@@ -535,11 +535,15 @@ class Yate extends EventEmitter {
 			console = this._console; // console -> Yate.output
 		} else {
 			// do not reconnect on exit
-			process.on("SIGINT", () => {
-				if (this._socket) this._socket.end();
+			process.on("beforeExit", () => {
+				this._connected = false;
 				this._reconnect = false;
+				if (this._timer) clearTimeout(this._timer);
+				if (this._socket) {
+					this._socket.removeAllListeners();
+					this._socket.end();
+				}
 				this.removeAllListeners();
-				setTimeout(process.exit, 100);
 			});
 		}
 
@@ -624,9 +628,7 @@ class Yate extends EventEmitter {
 		// local
 		if (!this._host) {
 			if (this._connected) return Promise.resolve(false);
-			this._connected = true;
-			let rl = createInterface(this.in);
-			rl.on("line", line => { this._read(line) });
+			this._init();
 			if (typeof callback === "function") callback(); // <-- callback
 			return Promise.resolve(true);
 		}
@@ -652,7 +654,7 @@ class Yate extends EventEmitter {
 			if (this._debug) this.emit("_debug", "<Socket> end");
 		});
 
-		this._socket.once("error", error => {
+		this._socket.on("error", error => {
 			this._connected = false;
 			if (this._timer) clearTimeout(this._timer); // (*)
 			if (this._debug) this.emit("_debug", "<Socket> error");
@@ -675,9 +677,7 @@ class Yate extends EventEmitter {
 				// workaround for socket case: "end" just after "connect"
 				this._timer = setTimeout(() => {
 					this.in = this.out = this._socket;
-					this._connected = true;
-					let rl = createInterface(this.in);
-					rl.on("line", line => { this._read(line) });
+					this._init();
 					this._connect("global", this._trackname, "data");
 					this.emit("_connect");
 					resolve(true);
@@ -693,6 +693,17 @@ class Yate extends EventEmitter {
 				host: this._host,
 				timeout: this.timeout
 			});
+		});
+	}
+
+	_init() {
+		this._connected = true;
+		this._rl = createInterface(this.in);
+		this._rl.on("line", line => { this._read(line) });
+		this._rl.on("error", () => {
+			if (this._debug) this.emit("_debug", "<Socket> readline error");
+			this._rl.removeAllListeners();
+			this._rl.close();
 		});
 	}
 
@@ -1503,17 +1514,7 @@ class Yate extends EventEmitter {
 		if (line.length > this.bufsize) line = line.substr(0, this.bufsize); // trim the line to max buffer size
 		if (this._connected) {
 			if (this._debug) this.emit("_debug", "--> " + line);
-			try { this.out.write(line.endsWith("\n") ? line : line + "\n"); }
-			catch(error) {
-				this._connected = false;
-				if (this._timer) clearTimeout(this._timer);
-				if (this._debug) this.emit("_debug", "<I/O> error");
-				if (this._reconnect) {
-					this._timer = setTimeout(() => { this.init().then(() => this._restore()) }, this._reconnnect_timeout);
-				} else {
-					this.emit("_error", error);
-				}
-			}
+			this.out.write(line.endsWith("\n") ? line : line + "\n");
 		} else {
 			// scheduled line
 			this.once("_connect", () => { this._write(line) });

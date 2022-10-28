@@ -1,6 +1,6 @@
 {
   "name": "next-yate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Next-Yate is Nodejs External module for YATE (Yet Another Telephony Engine)",
   "main": "index.js",
   "scripts": {
