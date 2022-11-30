@@ -1,7 +1,7 @@
 /**
  * @file "Next-Yate"
  * @author 0LEG0 <a.i.s@gmx.com>
- * @version 0.2.0
+ * @version 0.2.1
  * @license Apache-2.0
  * @description Next-Yate is Nodejs External module for YATE (Yet Another Telephony Engine).
  * @see https://github.com/0LEG0/next-yate
